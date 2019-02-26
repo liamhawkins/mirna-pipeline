@@ -194,33 +194,13 @@ def index_is_built(ind_prefix, index_name):
     return True
 
 
-def build_neg_index():
-    if not index_is_built(NEG_IND_DIR, 'Negative'):
-        if not os.path.exists(NEG_IND_DIR):
-            os.makedirs(NEG_IND_DIR)
+def build_index(index_dir, index_name):
+    if not index_is_built(index_dir, index_name):
+        if not os.path.exists(index_dir):
+            os.makedirs(index_dir)
 
         message = 'Building negative index'
-        command = 'bowtie-build {} {}'.format(NEG_FILE, os.path.join(NEG_IND_DIR, os.path.basename(NEG_IND_DIR)))
-        run_command(message, command)
-
-
-def build_mature_index():
-    if not index_is_built(MATURE_IND_DIR, 'Mature'):
-        if not os.path.exists(MATURE_IND_DIR):
-            os.makedirs(MATURE_IND_DIR)
-
-        message = 'Building mature index'
-        command = 'bowtie-build {} {}'.format(MATURE_FILE, os.path.join(MATURE_IND_DIR, os.path.basename(MATURE_IND_DIR)))
-        run_command(message, command)
-
-
-def build_hairpin_index():
-    if not index_is_built(HP_IND_DIR, 'Hairpin'):
-        if not os.path.exists(HP_IND_DIR):
-            os.makedirs(HP_IND_DIR)
-
-        message = 'Building Hairpin index'
-        command = 'bowtie-build {} {}'.format(HP_FILE, os.path.join(HP_IND_DIR, os.path.basename(HP_IND_DIR)))
+        command = 'bowtie-build {} {}'.format(NEG_FILE, os.path.join(index_dir, os.path.basename(index_dir)))
         run_command(message, command)
 
 
@@ -375,9 +355,9 @@ if __name__ == '__main__':
         trim_6 = False
         adapter_file = os.path.join(SEQ_DIR, 'illumina_adapters.fasta')
 
-    build_neg_index()
-    build_mature_index()
-    build_hairpin_index()
+    build_index(NEG_IND_DIR, 'negative')
+    build_index(MATURE_IND_DIR, 'mature')
+    build_index(HP_IND_DIR, 'hairpin')
 
     # Process files one at a time
     for filename in sorted(os.listdir(RAW_FILES_DIR)):
