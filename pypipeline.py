@@ -5,6 +5,7 @@ from datetime import datetime
 from subprocess import Popen
 import subprocess
 from prompt_toolkit import print_formatted_text, HTML
+from prompt_toolkit.shortcuts import yes_no_dialog
 try:
     from config import COMPANY, ANALYSIS_DIR, SEQ_DIR, RAW_FILES_DIR, NEG_FILE, MATURE_FILE, HP_FILE, CONDITION_FILE, PREFIX
 except ImportError:
@@ -115,14 +116,9 @@ def validate_config():
 
     print_formatted_text(GOOD)
 
-    print('\n')
-    for filename in sorted(os.listdir(RAW_FILES_DIR)):
-        if filename.endswith('.fastq') or filename.endswith('.fq'):
-            print(filename)
-
-    file_validation = input('\n[{}] Are these the files you want to process? (y/n): '.format(PIPELINE))
-    if file_validation in ['n', 'N', 'no', 'NO', 'No']:
-        print('[{}] Exiting'.format(PIPELINE))
+    files = '\n'.join([file for file in sorted(os.listdir(RAW_FILES_DIR)) if file.endswith('.fastq') or file.endswith('.fq')])
+    continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
+    if not continue_:
         exit(0)
 
 
@@ -340,11 +336,15 @@ if __name__ == '__main__':
     build_index(MATURE_IND_DIR, 'mature')
     build_index(HP_IND_DIR, 'hairpin')
 
+    fastqc = yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
+    if fastqc:
+        for filename in sorted(os.listdir(RAW_FILES_DIR)):
+            fastq_file = os.path.join(RAW_FILES_DIR, filename)
+            fastqc_check(fastq_file=fastq_file)
+
     # Process files one at a time
     for filename in sorted(os.listdir(RAW_FILES_DIR)):
         fastq_file = os.path.join(RAW_FILES_DIR, filename)
-
-        # fastqc_check(fastq_file=fastq_file)
         trimmed_file = trim_adapters(fastq_file=fastq_file, adapter_file=adapter_file, trim_6=trim_6)
         filtered_file = filter_out_neg(trimmed_file=trimmed_file)
         mature_aligned_bam, unaligned_reads = align_mature(filtered_file)
