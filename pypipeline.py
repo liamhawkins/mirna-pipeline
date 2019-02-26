@@ -225,8 +225,7 @@ def build_hairpin_index():
 
 
 def filter_out_neg(trimmed_file):
-    if not os.path.exists(FLT_DIR):
-        os.mkdir(FLT_DIR)
+    os.makedirs(FLT_DIR, exist_ok=True)
 
     basename = get_basename(trimmed_file)
     negative_index = os.path.join(NEG_IND_DIR, os.path.basename(NEG_IND_DIR))
@@ -243,11 +242,8 @@ def filter_out_neg(trimmed_file):
 
 
 def align_mature(filtered_file):
-    if not os.path.exists(MATURE_ALIGNED_DIR):
-        os.mkdir(MATURE_ALIGNED_DIR)
-
-    if not os.path.exists(MATURE_UNALIGNED_DIR):
-        os.mkdir(MATURE_UNALIGNED_DIR)
+    os.makedirs(MATURE_ALIGNED_DIR, exist_ok=True)
+    os.makedirs(MATURE_UNALIGNED_DIR, exist_ok=True)
 
     basename = get_basename(filtered_file)
     mature_index = os.path.join(MATURE_IND_DIR, os.path.basename(MATURE_IND_DIR))
@@ -273,8 +269,7 @@ def align_mature(filtered_file):
 
 
 def align_hairpins(unaligned_reads):
-    if not os.path.exists(HP_ALIGNED_DIR):
-        os.mkdir(HP_ALIGNED_DIR)
+    os.makedirs(HP_ALIGNED_DIR, exist_ok=True)
 
     basename = get_basename(unaligned_reads)
     hairpin_index = os.path.join(HP_IND_DIR, os.path.basename(HP_IND_DIR))
@@ -299,8 +294,7 @@ def align_hairpins(unaligned_reads):
 
 
 def get_mature_read_counts(aligned_bam):
-    if not os.path.exists(MATURE_READ_COUNT_DIR):
-        os.mkdir(MATURE_READ_COUNT_DIR)
+    os.makedirs(MATURE_READ_COUNT_DIR, exist_ok=True)
 
     basename = get_basename(aligned_bam)
     sorted_file = os.path.join(MATURE_READ_COUNT_DIR, basename + '.sorted')
@@ -325,8 +319,7 @@ def get_mature_read_counts(aligned_bam):
 
 
 def get_hp_read_counts(aligned_bam):
-    if not os.path.exists(HAIRPIN_READ_COUNT_DIR):
-        os.mkdir(HAIRPIN_READ_COUNT_DIR)
+    os.makedirs(HAIRPIN_READ_COUNT_DIR, exist_ok=True)
 
     basename = get_basename(aligned_bam)
     sorted_file = os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '.sorted')
