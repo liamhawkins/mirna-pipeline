@@ -77,6 +77,7 @@ def run_command(message, command):
 
 def log_message(message, command_status='GOOD'):
     formatted_message = '[{}] '.format(PIPELINE) + message + '... '
+    print(formatted_message + command_status)
     with open(LOG_FILE, 'a') as f:
         f.write(formatted_message + command_status + '\n')
 
@@ -158,38 +159,37 @@ def trim_adapters(fastq_file, adapter_file, trim_6=False):
 
     output_file = os.path.join(TRIMMED_DIR, get_basename(fastq_file) + '.trimmed.fastq')
     temp_file = os.path.join(TRIMMED_DIR, 'temp.fastq')
+
     message = 'Trimming adapters from {}'.format(fastq_file)
     command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(adapter_file, fastq_file, temp_file)
-    run_command(message, command)
-
-    if trim_6:
-        message = 'Trimming 6 nucleotides from {}'.format(temp_file)
-        command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(temp_file, output_file)
-        run_command(message, command)
-        os.remove(temp_file)
+    if os.path.exists(output_file):
+        log_message(message, command_status='FILE ALREADY EXISTS')
     else:
-        os.rename(temp_file, output_file)
+        run_command(message, command)
+
+        if trim_6:
+            message = 'Trimming 6 nucleotides from {}'.format(temp_file)
+            command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(temp_file, output_file)
+            run_command(message, command)
+            os.remove(temp_file)
+        else:
+            os.rename(temp_file, output_file)
 
     return output_file
 
 
 def index_is_built(ind_prefix, index_name):
-    print('[{}] Checking if {} index is built... '.format(PIPELINE, index_name), end='', flush=True)
-
     try:
         os.listdir(os.path.dirname(ind_prefix))
     except FileNotFoundError:
-        print('NOT BUILT')
         log_message('Checking if {} index is built'.format(index_name), command_status='NOT BUILT')
         return False
 
     for filename in os.listdir(ind_prefix):
         if not filename.startswith(os.path.basename(ind_prefix)) or not filename.endswith('.ebwt'):
-            print('NOT BUILT')
             log_message('Checking if {} index is built'.format(index_name), command_status='NOT BUILT')
             return False
 
-    print('GOOD')
     log_message('Checking if {} index is built'.format(index_name))
     return True
 
@@ -234,7 +234,10 @@ def filter_out_neg(trimmed_file):
 
     message = 'Filtering negative RNA species from {}'.format(trimmed_file)
     command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, trimmed_file, output_file)
-    run_command(message, command)
+    if os.path.exists(output_file):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     return output_file
 
@@ -254,11 +257,17 @@ def align_mature(filtered_file):
 
     message = 'Aligning {} to mature index'.format(filtered_file)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
-    run_command(message, command)
+    if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
+        log_message(message, command_status='FILES ALREADY EXIST')
+    else:
+        run_command(message, command)
 
     message = 'Converting SAM to BAM: {} to {}'.format(aligned_sam, aligned_bam)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
-    run_command(message, command)
+    if os.path.exists(aligned_bam):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     return aligned_bam, unaligned_reads
 
@@ -274,11 +283,17 @@ def align_hairpins(unaligned_reads):
 
     message = 'Aligned {} to hairpin index'.format(unaligned_reads)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
-    run_command(message, command)
+    if os.path.exists(aligned_sam):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     message = 'Converting SAM to BAM: {} to {}'.format(aligned_sam, aligned_bam)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
-    run_command(message, command)
+    if os.path.exists(aligned_bam):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     return aligned_bam
 
@@ -294,11 +309,17 @@ def get_mature_read_counts(aligned_bam):
 
     message = 'Sorting {}'.format(aligned_bam)
     command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
-    run_command(message, command)
+    if os.path.exists(sorted_file_bam):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     message = 'Generating read count file from {}'.format(sorted_file_bam)
     command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
-    run_command(message, command)
+    if os.path.exists(readcount):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     return readcount
 
@@ -314,12 +335,17 @@ def get_hp_read_counts(aligned_bam):
 
     message = 'Sorting {}'.format(aligned_bam)
     command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
-    run_command(message, command)
+    if os.path.exists(sorted_file_bam):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     message = 'Generating read count file from {}'.format(sorted_file_bam)
-    command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(
-        sorted_file_bam=sorted_file_bam, readcount_file=readcount)
-    run_command(message, command)
+    command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
+    if os.path.exists(readcount):
+        log_message(message, command_status='FILE ALREADY EXISTS')
+    else:
+        run_command(message, command)
 
     return readcount
 
