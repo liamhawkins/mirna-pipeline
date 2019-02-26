@@ -279,38 +279,13 @@ def align_hairpins(unaligned_reads):
     return aligned_bam
 
 
-def get_mature_read_counts(aligned_bam):
-    os.makedirs(MATURE_READ_COUNT_DIR, exist_ok=True)
+def get_read_counts(read_count_dir, aligned_bam):
+    os.makedirs(read_count_dir, exist_ok=True)
 
     basename = get_basename(aligned_bam)
-    sorted_file = os.path.join(MATURE_READ_COUNT_DIR, basename + '.sorted')
-    sorted_file_bam = os.path.join(MATURE_READ_COUNT_DIR, basename + '.sorted.bam')
-    readcount = os.path.join(MATURE_READ_COUNT_DIR, basename + 'read_count.txt')
-
-    message = 'Sorting {}'.format(aligned_bam)
-    command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
-    if os.path.exists(sorted_file_bam):
-        log_message(message, command_status=FILE_ALREADY_EXISTS)
-    else:
-        run_command(message, command)
-
-    message = 'Generating read count file from {}'.format(sorted_file_bam)
-    command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
-    if os.path.exists(readcount):
-        log_message(message, command_status=FILE_ALREADY_EXISTS)
-    else:
-        run_command(message, command)
-
-    return readcount
-
-
-def get_hp_read_counts(aligned_bam):
-    os.makedirs(HAIRPIN_READ_COUNT_DIR, exist_ok=True)
-
-    basename = get_basename(aligned_bam)
-    sorted_file = os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '.sorted')
-    sorted_file_bam = os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '.sorted.bam')
-    readcount = os.path.join(HAIRPIN_READ_COUNT_DIR, basename + 'read_count.txt')
+    sorted_file = os.path.join(read_count_dir, basename + '.sorted')
+    sorted_file_bam = os.path.join(read_count_dir, basename + '.sorted.bam')
+    readcount = os.path.join(read_count_dir, basename + 'read_count.txt')
 
     message = 'Sorting {}'.format(aligned_bam)
     command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
@@ -374,6 +349,6 @@ if __name__ == '__main__':
         filtered_file = filter_out_neg(trimmed_file=trimmed_file)
         mature_aligned_bam, unaligned_reads = align_mature(filtered_file)
         hairpin_aligned_bam = align_hairpins(unaligned_reads)
-        mature_readcount = get_mature_read_counts(mature_aligned_bam)
-        hairpin_readcount = get_hp_read_counts(hairpin_aligned_bam)
+        mature_readcount = get_read_counts(MATURE_READ_COUNT_DIR, mature_aligned_bam)
+        hairpin_readcount = get_read_counts(HAIRPIN_READ_COUNT_DIR, hairpin_aligned_bam)
         exit()
