@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from subprocess import Popen
 import subprocess
+from prompt_toolkit import print_formatted_text, HTML
 try:
     from config import COMPANY, ANALYSIS_DIR, SEQ_DIR, RAW_FILES_DIR, NEG_FILE, MATURE_FILE, HP_FILE, CONDITION_FILE, PREFIX
 except ImportError:
@@ -41,17 +42,11 @@ PCA_CSV = PREFIX + '_pca_csv'
 # FIRST_FILE_BASENAME
 # STRESS_NAME
 
-
-def log_stdout(stdout):
-    with open(LOG_FILE, 'a') as f:
-        f.write(stdout.decode('utf-8'))
-    del stdout
-
-
-def validate_file(file_):
-    if not os.path.isfile(file_):
-        print('[{}] {} does not exist, EXITING'.format(PIPELINE, file_))
-        exit(1)
+GOOD = HTML('<green>GOOD</green>')
+FILE_ALREADY_EXISTS = HTML('<yellow>FILE ALREADY EXISTS</yellow>')
+NOT_BUILT = HTML('<yellow>NOT BUILT</yellow>')
+BAD = HTML('<red>BAD</red>')
+EXITING = HTML('<red>EXITING</red>')
 
 
 def run_command(message, command):
@@ -63,10 +58,10 @@ def run_command(message, command):
         with open(LOG_FILE, 'a') as f:
             f.write(formatted_message + 'GOOD\n')
             f.write(output.decode('utf-8'))
-        print('GOOD')
+        print_formatted_text(GOOD)
         del output
     except subprocess.CalledProcessError as exc:
-        print('BAD')
+        print_formatted_text(BAD)
         print('ERROR:')
         print(exc.output.decode('utf-8'))
         with open(LOG_FILE, 'a') as f:
@@ -75,11 +70,23 @@ def run_command(message, command):
         exit(1)
 
 
-def log_message(message, command_status='GOOD'):
+def log_message(message, command_status=GOOD):
     formatted_message = '[{}] '.format(PIPELINE) + message + '... '
-    print(formatted_message + command_status)
+    print_formatted_text(HTML(formatted_message + command_status.value))
+
+    if type(command_status) == str:
+        log_text = command_status
+    else:
+        log_text = command_status.value
+
     with open(LOG_FILE, 'a') as f:
-        f.write(formatted_message + command_status + '\n')
+        f.write(formatted_message + log_text + '\n')
+
+
+def validate_file(file_):
+    if not os.path.isfile(file_):
+        log_message('{} does not exist'.format(file_), command_status=EXITING)
+        exit(1)
 
 
 def validate_config():
@@ -94,20 +101,19 @@ def validate_config():
     validate_file(CONDITION_FILE)
 
     if COMPANY.upper() not in ['BC', 'TORONTO']:
-        print('BAD')
-        print('[{}] COMPANY must be "BC" or "TORONTO"'.format(PIPELINE))
+        log_message('COMPANY must be "BC" or "TORONTO"', command_status=EXITING)
         exit(1)
 
-    if not os.path.isfile(os.path.join(SEQ_DIR, 'illumina_adapters.fasta')):
-        print('BAD')
-        print('[{}] {} is missing, exiting'.format(PIPELINE, os.path.isfile(os.path.join(SEQ_DIR, 'illumina_adapters.fasta'))))
+    if COMPANY.upper() == 'TORONTO':
+        adapters = 'illumina_adapters.fasta'
+    else:
+        adapters = 'bc_adapters.fasta'
+
+    if not os.path.isfile(os.path.join(SEQ_DIR, adapters)):
+        log_message('{} is missing, exiting'.format(os.path.isfile(os.path.join(SEQ_DIR, adapters))), command_status=EXITING)
         exit(1)
 
-    if not os.path.isfile(os.path.join(SEQ_DIR, 'bc_adapters.fasta')):
-        print('BAD')
-        print('[{}] {} is missing, exiting'.format(PIPELINE, os.path.isfile(os.path.join(SEQ_DIR, 'bc_adapters.fasta'))))
-        exit(1)
-    print('GOOD')
+    print_formatted_text(GOOD)
 
     print('\n')
     for filename in sorted(os.listdir(RAW_FILES_DIR)):
@@ -125,7 +131,7 @@ def check_program(program):
 
     try:
         Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).communicate()
-        print('GOOD')
+        print_formatted_text(HTML('<green>GOOD</green>'))
     except OSError as e:
         if e.errno == os.errno.ENOENT:
             print('BAD')
@@ -163,7 +169,7 @@ def trim_adapters(fastq_file, adapter_file, trim_6=False):
     message = 'Trimming adapters from {}'.format(fastq_file)
     command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(adapter_file, fastq_file, temp_file)
     if os.path.exists(output_file):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
@@ -182,12 +188,12 @@ def index_is_built(ind_prefix, index_name):
     try:
         os.listdir(os.path.dirname(ind_prefix))
     except FileNotFoundError:
-        log_message('Checking if {} index is built'.format(index_name), command_status='NOT BUILT')
+        log_message('Checking if {} index is built'.format(index_name), command_status=NOT_BUILT)
         return False
 
     for filename in os.listdir(ind_prefix):
         if not filename.startswith(os.path.basename(ind_prefix)) or not filename.endswith('.ebwt'):
-            log_message('Checking if {} index is built'.format(index_name), command_status='NOT BUILT')
+            log_message('Checking if {} index is built'.format(index_name), command_status=NOT_BUILT)
             return False
 
     log_message('Checking if {} index is built'.format(index_name))
@@ -214,7 +220,7 @@ def filter_out_neg(trimmed_file):
     message = 'Filtering negative RNA species from {}'.format(trimmed_file)
     command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, trimmed_file, output_file)
     if os.path.exists(output_file):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
@@ -234,14 +240,14 @@ def align_mature(filtered_file):
     message = 'Aligning {} to mature index'.format(filtered_file)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
     if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
-        log_message(message, command_status='FILES ALREADY EXIST')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
     message = 'Converting SAM to BAM: {} to {}'.format(aligned_sam, aligned_bam)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
     if os.path.exists(aligned_bam):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
@@ -259,14 +265,14 @@ def align_hairpins(unaligned_reads):
     message = 'Aligned {} to hairpin index'.format(unaligned_reads)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
     if os.path.exists(aligned_sam):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
     message = 'Converting SAM to BAM: {} to {}'.format(aligned_sam, aligned_bam)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
     if os.path.exists(aligned_bam):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
@@ -284,14 +290,14 @@ def get_mature_read_counts(aligned_bam):
     message = 'Sorting {}'.format(aligned_bam)
     command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
     if os.path.exists(sorted_file_bam):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
     message = 'Generating read count file from {}'.format(sorted_file_bam)
     command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
     if os.path.exists(readcount):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
@@ -309,14 +315,14 @@ def get_hp_read_counts(aligned_bam):
     message = 'Sorting {}'.format(aligned_bam)
     command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
     if os.path.exists(sorted_file_bam):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
     message = 'Generating read count file from {}'.format(sorted_file_bam)
     command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
     if os.path.exists(readcount):
-        log_message(message, command_status='FILE ALREADY EXISTS')
+        log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
