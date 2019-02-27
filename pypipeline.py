@@ -230,8 +230,8 @@ def align_mature(filtered_file):
 
     basename = get_basename(filtered_file)
     mature_index = os.path.join(MATURE_IND_DIR, os.path.basename(MATURE_IND_DIR))
-    aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '.aligned.sam')
-    aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '.aligned.bam')
+    aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '_MATURE.aligned.sam')
+    aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '_MATURE.aligned.bam')
     unaligned_reads = os.path.join(MATURE_UNALIGNED_DIR, basename + '.unaligned.fastq')
 
     message = 'Aligning {} to mature index'.format(os.path.basename(filtered_file))
@@ -256,8 +256,8 @@ def align_hairpins(unaligned_reads):
 
     basename = get_basename(unaligned_reads)
     hairpin_index = os.path.join(HP_IND_DIR, os.path.basename(HP_IND_DIR))
-    aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '.aligned.sam')
-    aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '.aligned.bam')
+    aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.sam')
+    aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.bam')
 
     message = 'Aligned {} to hairpin index'.format(os.path.basename(unaligned_reads))
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
@@ -282,7 +282,7 @@ def get_read_counts(read_count_dir, aligned_bam):
     basename = get_basename(aligned_bam)
     sorted_file = os.path.join(read_count_dir, basename + '.sorted')
     sorted_file_bam = os.path.join(read_count_dir, basename + '.sorted.bam')
-    readcount = os.path.join(read_count_dir, basename + 'read_count.txt')
+    readcount = os.path.join(read_count_dir, basename + '.read_count.txt')
 
     message = 'Sorting {}'.format(os.path.basename(aligned_bam))
     command = 'samtools sort -n {} -o {}'.format(aligned_bam, sorted_file)
