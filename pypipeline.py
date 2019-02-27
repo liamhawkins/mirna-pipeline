@@ -81,7 +81,10 @@ def log_message(message, command_status=GOOD, **kwargs):
     if type(command_status) == str:
         log_text = command_status
     else:
-        log_text = command_status.formatted_text[0][1]
+        try:
+            log_text = command_status.formatted_text[0][1]
+        except IndexError:
+            log_text = command_status.value
 
     with open(LOG_FILE, 'a') as f:
         f.write(formatted_message + log_text + '\n')
@@ -188,8 +191,9 @@ def trim_adapters(fastq_file, adapter_file, trim_6=False):
 
     output_file = os.path.join(TRIMMED_DIR, get_basename(fastq_file) + '.trimmed.fastq')
     temp_file = os.path.join(TRIMMED_DIR, 'temp.fastq')
+    basename = get_basename(fastq_file)
 
-    message = 'Trimming adapters from {}'.format(os.path.basename(fastq_file))
+    message = '{}: Trimming adapters'.format(basename)
     command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(adapter_file, fastq_file, temp_file)
     if os.path.exists(output_file):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
@@ -197,7 +201,7 @@ def trim_adapters(fastq_file, adapter_file, trim_6=False):
         run_command(message, command)
 
         if trim_6:
-            message = 'Trimming 6 nucleotides from {}'.format(os.path.basename(temp_file))
+            message = '{}: Trimming 6 nucleotides'.format(basename)
             command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(temp_file, output_file)
             run_command(message, command)
             os.remove(temp_file)
@@ -214,7 +218,7 @@ def filter_out_neg(trimmed_file):
     negative_index = os.path.join(NEG_IND_DIR, os.path.basename(NEG_IND_DIR))
     output_file = os.path.join(FLT_DIR, basename + '.filtered.fastq')
 
-    message = 'Filtering negative RNA species from {}'.format(os.path.basename(trimmed_file))
+    message = '{}: Filtering negative RNA species'.format(basename)
     command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, trimmed_file, output_file)
     if os.path.exists(output_file):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
@@ -234,14 +238,14 @@ def align_mature(filtered_file):
     aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '_MATURE.aligned.bam')
     unaligned_reads = os.path.join(MATURE_UNALIGNED_DIR, basename + '.unaligned.fastq')
 
-    message = 'Aligning {} to mature index'.format(os.path.basename(filtered_file))
-    command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
+    message = '{}: Aligning to mature index'.format(basename)
+    command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
     if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
-    message = 'Converting SAM to BAM: {} to {}'.format(os.path.basename(aligned_sam), os.path.basename(aligned_bam))
+    message = '{}: Converting SAM to BAM'.format(basename)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
     if os.path.exists(aligned_bam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
@@ -259,14 +263,14 @@ def align_hairpins(unaligned_reads):
     aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.sam')
     aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.bam')
 
-    message = 'Aligned {} to hairpin index'.format(os.path.basename(unaligned_reads))
+    message = '{}: Aligning to hairpin index'.format(basename)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
     if os.path.exists(aligned_sam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
-    message = 'Converting SAM to BAM: {} to {}'.format(os.path.basename(aligned_sam), os.path.basename(aligned_bam))
+    message = '{}: Converting SAM to BAM'.format(basename)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
     if os.path.exists(aligned_bam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
@@ -284,14 +288,14 @@ def get_read_counts(read_count_dir, aligned_bam):
     sorted_file_bam = os.path.join(read_count_dir, basename + '.sorted.bam')
     readcount = os.path.join(read_count_dir, basename + '.read_count.txt')
 
-    message = 'Sorting {}'.format(os.path.basename(aligned_bam))
+    message = '{}: Sorting BAM'.format(basename)
     command = 'samtools sort -n {} -o {}'.format(aligned_bam, sorted_file_bam)
     if os.path.exists(sorted_file_bam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
-    message = 'Generating read count file from {}'.format(os.path.basename(sorted_file_bam))
+    message = '{}: Generating read count file'.format(basename)
     command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
     if os.path.exists(readcount):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
