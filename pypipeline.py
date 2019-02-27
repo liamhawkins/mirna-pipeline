@@ -43,12 +43,14 @@ PCA_CSV = PREFIX + '_pca_csv'
 # FIRST_FILE_BASENAME
 # STRESS_NAME
 
+# FORMATED STRINGS
 GOOD = HTML('<green>GOOD</green>')
 FILE_ALREADY_EXISTS = HTML('<yellow>FILE ALREADY EXISTS</yellow>')
 NOT_BUILT = HTML('<yellow>NOT BUILT</yellow>')
 BAD = HTML('<red>BAD</red>')
 EXITING = HTML('<red>EXITING</red>')
 NONE = HTML('')
+F_PIPELINE = HTML('<teal>{}</teal>'.format(PIPELINE))
 
 
 def run_command(message, command):
@@ -96,7 +98,7 @@ def validate_config():
     command = 'touch {}'.format(LOG_FILE)
     run_command(message, command)
 
-    log_message('Performing config validation'.format(PIPELINE), command_status=NONE, end='', flush=True)
+    log_message('Performing config validation', command_status=NONE, end='', flush=True)
     validate_file(NEG_FILE)
     validate_file(MATURE_FILE)
     validate_file(HP_FILE)
@@ -124,7 +126,7 @@ def validate_config():
 
 
 def check_program(program):
-    log_message('Checking that {} is installed'.format(PIPELINE, program), command_status=NONE, end='', flush=True)
+    log_message('Checking that {} is installed'.format(program), command_status=NONE, end='', flush=True)
 
     try:
         Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).communicate()
