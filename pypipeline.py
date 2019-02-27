@@ -81,7 +81,7 @@ def log_message(message, command_status=GOOD, **kwargs):
     if type(command_status) == str:
         log_text = command_status
     else:
-        log_text = command_status.value
+        log_text = command_status.formatted_text[0][1]
 
     with open(LOG_FILE, 'a') as f:
         f.write(formatted_message + log_text + '\n')
