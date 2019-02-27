@@ -285,14 +285,14 @@ def get_read_counts(read_count_dir, aligned_bam):
     readcount = os.path.join(read_count_dir, basename + '.read_count.txt')
 
     message = 'Sorting {}'.format(os.path.basename(aligned_bam))
-    command = 'samtools sort -n {} -o {}'.format(aligned_bam, sorted_file)
+    command = 'samtools sort -n {} -o {}'.format(aligned_bam, sorted_file_bam)
     if os.path.exists(sorted_file_bam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
         run_command(message, command)
 
     message = 'Generating read count file from {}'.format(os.path.basename(sorted_file_bam))
-    command = "samtools view {sorted_file_bam} | awk '{print $3}' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount)
+    command = "samtools view {sorted_file_bam} | awk '[print $3]' | sort | uniq -c | sort -nr > {readcount_file}".format(sorted_file_bam=sorted_file_bam, readcount_file=readcount).replace('[', '{').replace(']', '}')
     if os.path.exists(readcount):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
