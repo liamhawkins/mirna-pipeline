@@ -261,8 +261,8 @@ def align_hairpins(unaligned_reads):
 
     basename = get_basename(unaligned_reads)
     hairpin_index = os.path.join(HP_IND_DIR, os.path.basename(HP_IND_DIR))
-    aligned_sam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.sam')
-    aligned_bam = os.path.join(MATURE_ALIGNED_DIR, basename + '_HAIRPIN.aligned.bam')
+    aligned_sam = os.path.join(HP_ALIGNED_DIR, basename + '_HAIRPIN.aligned.sam')
+    aligned_bam = os.path.join(HP_ALIGNED_DIR, basename + '_HAIRPIN.aligned.bam')
 
     message = '{}: Aligning to hairpin index'.format(basename)
     command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
@@ -285,7 +285,6 @@ def get_read_counts(read_count_dir, aligned_bam):
     os.makedirs(read_count_dir, exist_ok=True)
 
     basename = get_basename(aligned_bam)
-    sorted_file = os.path.join(read_count_dir, basename + '.sorted')
     sorted_file_bam = os.path.join(read_count_dir, basename + '.sorted.bam')
     readcount = os.path.join(read_count_dir, basename + '.read_count.txt')
 
@@ -361,8 +360,11 @@ if __name__ == '__main__':
         hairpin_readcount = get_read_counts(HAIRPIN_READ_COUNT_DIR, hairpin_aligned_bam)
 
         if delete:
-            log_message('{}: Deleting intermediate files'.format(get_basename(filename)))
+            basename = get_basename(filename)
+            log_message('{}: Deleting intermediate files'.format(basename))
             rmtree(FLT_DIR)
             rmtree(MATURE_DIR)
             rmtree(HP_DIR)
             rmtree(TRIMMED_DIR)
+            os.remove(os.path.join(MATURE_READ_COUNT_DIR, basename + '_MATURE.sorted.bam'))
+            os.remove(os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '_HAIRPIN.sorted.bam'))
