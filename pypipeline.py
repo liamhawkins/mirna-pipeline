@@ -48,6 +48,7 @@ FILE_ALREADY_EXISTS = HTML('<yellow>FILE ALREADY EXISTS</yellow>')
 NOT_BUILT = HTML('<yellow>NOT BUILT</yellow>')
 BAD = HTML('<red>BAD</red>')
 EXITING = HTML('<red>EXITING</red>')
+NONE = HTML('')
 
 
 def run_command(message, command):
@@ -71,9 +72,9 @@ def run_command(message, command):
         exit(1)
 
 
-def log_message(message, command_status=GOOD):
+def log_message(message, command_status=GOOD, **kwargs):
     formatted_message = '[{}] '.format(PIPELINE) + message + '... '
-    print_formatted_text(HTML(formatted_message + command_status.value))
+    print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
     if type(command_status) == str:
         log_text = command_status
@@ -95,7 +96,7 @@ def validate_config():
     command = 'touch {}'.format(LOG_FILE)
     run_command(message, command)
 
-    print('[{}] Performing config validation... '.format(PIPELINE), end='', flush=True)
+    log_message('Performing config validation'.format(PIPELINE), command_status=NONE, end='', flush=True)
     validate_file(NEG_FILE)
     validate_file(MATURE_FILE)
     validate_file(HP_FILE)
@@ -123,19 +124,17 @@ def validate_config():
 
 
 def check_program(program):
-    print('[{}] Checking that {} is installed... '.format(PIPELINE, program), end='', flush=True)
+    log_message('Checking that {} is installed'.format(PIPELINE, program), command_status=NONE, end='', flush=True)
 
     try:
         Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).communicate()
-        print_formatted_text(HTML('<green>GOOD</green>'))
+        print_formatted_text(GOOD)
     except OSError as e:
         if e.errno == os.errno.ENOENT:
-            print('BAD')
-            print('[{}] The program {} was not found'.format(PIPELINE, program))
+            log_message('The program {} was not found'.format(program), command_status=BAD)
             exit()
         else:
-            print('BAD')
-            print('[{}] An unknown error occurred when looking for {}'.format(PIPELINE, program))
+            log_message('An unknown error occurred when looking for {}'.format(program), command_status=BAD)
             raise
 
 
