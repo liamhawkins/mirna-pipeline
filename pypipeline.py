@@ -282,8 +282,8 @@ def get_read_counts(read_count_dir, aligned_bam):
     sorted_file_bam = os.path.join(read_count_dir, basename + '.sorted.bam')
     readcount = os.path.join(read_count_dir, basename + 'read_count.txt')
 
-    message = 'Sorting {}'.format(aligned_bam)
-    command = 'samtools sort -n {} {}'.format(aligned_bam, sorted_file)
+    message = 'Sorting {}'.format(os.path.basename(aligned_bam))
+    command = 'samtools sort -n {} -o {}'.format(aligned_bam, sorted_file)
     if os.path.exists(sorted_file_bam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
