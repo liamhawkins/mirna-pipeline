@@ -3,6 +3,7 @@
 import os
 from datetime import datetime
 from subprocess import Popen
+from shutil import rmtree
 import subprocess
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.shortcuts import yes_no_dialog
@@ -341,6 +342,8 @@ if __name__ == '__main__':
     build_index(MATURE_IND_DIR, 'mature')
     build_index(HP_IND_DIR, 'hairpin')
 
+    delete = yes_no_dialog(title='Delete files', text='Do you want to delete intermediate files?')
+
     fastqc = yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
     if fastqc:
         for filename in sorted(os.listdir(RAW_FILES_DIR)):
@@ -356,4 +359,10 @@ if __name__ == '__main__':
         hairpin_aligned_bam = align_hairpins(unaligned_reads)
         mature_readcount = get_read_counts(MATURE_READ_COUNT_DIR, mature_aligned_bam)
         hairpin_readcount = get_read_counts(HAIRPIN_READ_COUNT_DIR, hairpin_aligned_bam)
-        exit()
+
+        if delete:
+            log_message('{}: Deleting intermediate files'.format(get_basename(filename)))
+            rmtree(FLT_DIR)
+            rmtree(MATURE_DIR)
+            rmtree(HP_DIR)
+            rmtree(TRIMMED_DIR)
