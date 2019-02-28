@@ -8,7 +8,8 @@ import subprocess
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.shortcuts import yes_no_dialog
 try:
-    from config import COMPANY, ANALYSIS_DIR, SEQ_DIR, RAW_FILES_DIR, NEG_FILE, MATURE_FILE, HP_FILE, CONDITION_FILE, PREFIX
+    from config import COMPANY, ANALYSIS_DIR, RAW_FILES_DIR, NEG_FILE, MATURE_FILE, HP_FILE, CONDITION_FILE, \
+    PREFIX, TORONTO_ADAPTERS, BC_ADAPTERS
 except ImportError:
     print('ERROR importing config.py file. Check to make sure format is correct')
     exit(1)
@@ -108,12 +109,12 @@ def validate_config():
         exit(1)
 
     if COMPANY.upper() == 'TORONTO':
-        adapters = 'illumina_adapters.fasta'
+        adapters = TORONTO_ADAPTERS
     else:
-        adapters = 'bc_adapters.fasta'
+        adapters = BC_ADAPTERS
 
-    if not os.path.isfile(os.path.join(SEQ_DIR, adapters)):
-        log_message('{} is missing, exiting'.format(os.path.isfile(os.path.join(SEQ_DIR, adapters))), command_status=EXITING)
+    if not os.path.isfile(adapters):
+        log_message('{} is missing, exiting'.format(adapters), command_status=EXITING)
         exit(1)
 
     print_formatted_text(GOOD)
@@ -324,10 +325,10 @@ if __name__ == '__main__':
     # Set company specific variables
     if COMPANY == 'BC':
         trim_6 = True
-        adapter_file = os.path.join(SEQ_DIR, 'bc_adapters.fasta')
+        adapter_file = BC_ADAPTERS
     else:
         trim_6 = False
-        adapter_file = os.path.join(SEQ_DIR, 'illumina_adapters.fasta')
+        adapter_file = TORONTO_ADAPTERS
 
     build_index(NEG_IND_DIR, 'negative')
     build_index(MATURE_IND_DIR, 'mature')
