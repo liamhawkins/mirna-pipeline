@@ -362,3 +362,4 @@ if __name__ == '__main__':
                 rmtree(TRIMMED_DIR)
                 os.remove(os.path.join(MATURE_READ_COUNT_DIR, basename + '_MATURE.sorted.bam'))
                 os.remove(os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '_HAIRPIN.sorted.bam'))
+                os.remove(LOG_FILE)
