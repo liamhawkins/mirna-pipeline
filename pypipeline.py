@@ -54,25 +54,26 @@ NONE = HTML('')
 F_PIPELINE = HTML('<teal>{}</teal>'.format(PIPELINE))
 
 
-def run_command(message, command):
+def run_command(message, command, log_output=False):
     formatted_message = '[{}] '.format(PIPELINE) + message + '... '
-
     print(formatted_message, end='', flush=True)
+    with open(LOG_FILE, 'a') as f:
+        f.write(formatted_message)
+
     try:
-        output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-        with open(LOG_FILE, 'a') as f:
-            f.write(formatted_message + 'GOOD\n')
-            f.write(output.decode('utf-8'))
-        print_formatted_text(GOOD)
-        del output
+        if log_output:
+            subprocess.Popen(command + ' >> {}'.format(LOG_FILE), shell=True, stderr=subprocess.STDOUT).wait()
+        else:
+            subprocess.Popen(command, shell=True, stderr=subprocess.STDOUT).wait()
     except subprocess.CalledProcessError as exc:
         print_formatted_text(BAD)
         print('ERROR:')
         print(exc.output.decode('utf-8'))
         with open(LOG_FILE, 'a') as f:
-            f.write(formatted_message + 'BAD\n')
             f.write(exc.output.decode('utf-8'))
         exit(1)
+
+    print_formatted_text(GOOD)
 
 
 def log_message(message, command_status=GOOD, **kwargs):
@@ -199,12 +200,12 @@ def trim_adapters(fastq_file, adapter_file, trim_6=False):
     if os.path.exists(output_file):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
-        run_command(message, command)
+        run_command(message, command, log_output=True)
 
         if trim_6:
             message = '{}: Trimming 6 nucleotides'.format(basename)
             command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(temp_file, output_file)
-            run_command(message, command)
+            run_command(message, command, log_output=True)
             os.remove(temp_file)
         else:
             os.rename(temp_file, output_file)
@@ -224,7 +225,7 @@ def filter_out_neg(trimmed_file):
     if os.path.exists(output_file):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
-        run_command(message, command)
+        run_command(message, command, log_output=True)
 
     return output_file
 
@@ -244,7 +245,7 @@ def align_mature(filtered_file):
     if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
-        run_command(message, command)
+        run_command(message, command, log_output=True)
 
     message = '{}: Converting SAM to BAM'.format(basename)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
@@ -269,7 +270,7 @@ def align_hairpins(unaligned_reads):
     if os.path.exists(aligned_sam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
-        run_command(message, command)
+        run_command(message, command, log_output=True)
 
     message = '{}: Converting SAM to BAM'.format(basename)
     command = 'samtools view -S -b {} > {}'.format(aligned_sam, aligned_bam)
