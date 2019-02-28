@@ -80,16 +80,14 @@ def log_message(message, command_status=GOOD, **kwargs):
     formatted_message = '[{}] '.format(PIPELINE) + message + '... '
     print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
-    if type(command_status) == str:
-        log_text = command_status
-    else:
-        try:
-            log_text = command_status.formatted_text[0][1]
-        except IndexError:
-            log_text = command_status.value
-
     with open(LOG_FILE, 'a') as f:
-        f.write(formatted_message + log_text + '\n')
+        f.write(formatted_message + '\n')
+
+
+def create_log_file():
+    message = 'Creating log file {}'.format(os.path.basename(LOG_FILE))
+    command = 'touch {}'.format(LOG_FILE)
+    run_command(message, command)
 
 
 def validate_file(file_):
@@ -99,10 +97,6 @@ def validate_file(file_):
 
 
 def validate_config():
-    message = 'Creating log file {}'.format(os.path.basename(LOG_FILE))
-    command = 'touch {}'.format(LOG_FILE)
-    run_command(message, command)
-
     log_message('Performing config validation', command_status=NONE, end='', flush=True)
     validate_file(NEG_FILE)
     validate_file(MATURE_FILE)
@@ -317,6 +311,9 @@ def run_r_analysis():
 
 
 if __name__ == '__main__':
+    os.makedirs(ANALYSIS_DIR, exist_ok=True)
+    create_log_file()
+
     # Validate setup
     check_program('fastqc')
     check_program('fastq-mcf')
@@ -326,9 +323,6 @@ if __name__ == '__main__':
     check_program('samtools')
     check_program('Rscript')
     validate_config()
-
-    if not os.path.exists(ANALYSIS_DIR):
-        os.makedirs(ANALYSIS_DIR)
 
     # Set company specific variables
     if COMPANY == 'BC':
