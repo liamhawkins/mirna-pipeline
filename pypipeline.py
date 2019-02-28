@@ -140,8 +140,7 @@ def check_program(program):
 
 
 def fastqc_check(fastq_file):
-    if not os.path.exists(FASTQC_DIR):
-        os.makedirs(FASTQC_DIR)
+    os.makedirs(FASTQC_DIR, exist_ok=True)
 
     if not fastq_file.endswith(('.fastq', '.fq')):
         raise WrongFileTypeError('[{}] {} is not a .fastq file'.format(PIPELINE, fastq_file))
@@ -173,8 +172,7 @@ def index_is_built(ind_prefix, index_name):
 
 def build_index(index_dir, index_name):
     if not index_is_built(index_dir, index_name):
-        if not os.path.exists(index_dir):
-            os.makedirs(index_dir)
+        os.makedirs(index_dir, exist_ok=True)
 
         message = 'Building negative index'
         command = 'bowtie-build {} {}'.format(NEG_FILE, os.path.join(index_dir, os.path.basename(index_dir)))
@@ -182,8 +180,7 @@ def build_index(index_dir, index_name):
 
 
 def trim_adapters(fastq_file, adapter_file, trim_6=False):
-    if not os.path.exists(TRIMMED_DIR):
-        os.makedirs(TRIMMED_DIR)
+    os.makedirs(TRIMMED_DIR, exist_ok=True)
 
     output_file = os.path.join(TRIMMED_DIR, get_basename(fastq_file) + '.trimmed.fastq')
     temp_file = os.path.join(TRIMMED_DIR, 'temp.fastq')
