@@ -343,20 +343,21 @@ if __name__ == '__main__':
 
     # Process files one at a time
     for filename in sorted(os.listdir(RAW_FILES_DIR)):
-        fastq_file = os.path.join(RAW_FILES_DIR, filename)
-        trimmed_file = trim_adapters(fastq_file=fastq_file, adapter_file=adapter_file, trim_6=trim_6)
-        filtered_file = filter_out_neg(trimmed_file=trimmed_file)
-        mature_aligned_bam, unaligned_reads = align_mature(filtered_file)
-        hairpin_aligned_bam = align_hairpins(unaligned_reads)
-        mature_readcount = get_read_counts(MATURE_READ_COUNT_DIR, mature_aligned_bam)
-        hairpin_readcount = get_read_counts(HAIRPIN_READ_COUNT_DIR, hairpin_aligned_bam)
+        basename = get_basename(filename)
+        if not os.path.isfile(os.path.join(MATURE_READ_COUNT_DIR, basename + '_MATURE.read_count.txt')):
+            fastq_file = os.path.join(RAW_FILES_DIR, filename)
+            trimmed_file = trim_adapters(fastq_file=fastq_file, adapter_file=adapter_file, trim_6=trim_6)
+            filtered_file = filter_out_neg(trimmed_file=trimmed_file)
+            mature_aligned_bam, unaligned_reads = align_mature(filtered_file)
+            hairpin_aligned_bam = align_hairpins(unaligned_reads)
+            mature_readcount = get_read_counts(MATURE_READ_COUNT_DIR, mature_aligned_bam)
+            hairpin_readcount = get_read_counts(HAIRPIN_READ_COUNT_DIR, hairpin_aligned_bam)
 
-        if delete:
-            basename = get_basename(filename)
-            log_message('{}: Deleting intermediate files'.format(basename))
-            rmtree(FLT_DIR)
-            rmtree(MATURE_DIR)
-            rmtree(HP_DIR)
-            rmtree(TRIMMED_DIR)
-            os.remove(os.path.join(MATURE_READ_COUNT_DIR, basename + '_MATURE.sorted.bam'))
-            os.remove(os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '_HAIRPIN.sorted.bam'))
+            if delete:
+                log_message('{}: Deleting intermediate files'.format(basename))
+                rmtree(FLT_DIR)
+                rmtree(MATURE_DIR)
+                rmtree(HP_DIR)
+                rmtree(TRIMMED_DIR)
+                os.remove(os.path.join(MATURE_READ_COUNT_DIR, basename + '_MATURE.sorted.bam'))
+                os.remove(os.path.join(HAIRPIN_READ_COUNT_DIR, basename + '_HAIRPIN.sorted.bam'))
