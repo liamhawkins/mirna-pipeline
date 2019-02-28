@@ -213,7 +213,7 @@ def filter_out_neg(trimmed_file):
     output_file = os.path.join(FLT_DIR, basename + '.filtered.fastq')
 
     message = '{}: Filtering negative RNA species'.format(basename)
-    command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, trimmed_file, output_file)
+    command = 'bowtie -p 18 --quiet -q {} {} --un {}'.format(negative_index, trimmed_file, output_file)
     if os.path.exists(output_file):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
@@ -233,7 +233,7 @@ def align_mature(filtered_file):
     unaligned_reads = os.path.join(MATURE_UNALIGNED_DIR, basename + '.unaligned.fastq')
 
     message = '{}: Aligning to mature index'.format(basename)
-    command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
+    command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
     if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
@@ -258,7 +258,7 @@ def align_hairpins(unaligned_reads):
     aligned_bam = os.path.join(HP_ALIGNED_DIR, basename + '_HAIRPIN.aligned.bam')
 
     message = '{}: Aligning to hairpin index'.format(basename)
-    command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
+    command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, unaligned_reads, aligned_sam)
     if os.path.exists(aligned_sam):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
