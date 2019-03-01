@@ -235,7 +235,7 @@ def align_mature(filtered_file):
     unaligned_reads = os.path.join(MATURE_UNALIGNED_DIR, basename + '.unaligned.fastq')
 
     message = '{}: Aligning to mature index'.format(basename)
-    command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
+    command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(mature_index, filtered_file, aligned_sam, unaligned_reads)
     if os.path.exists(aligned_sam) and os.path.exists(unaligned_reads):
         log_message(message, command_status=FILE_ALREADY_EXISTS)
     else:
