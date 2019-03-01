@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# TODO: Add read count statistics
+# TODO: Look into BAM statistics
 
 import os
 from datetime import datetime
@@ -63,9 +65,9 @@ def run_command(message, command, log_output=False):
 
     try:
         if log_output:
-            subprocess.Popen(command + ' >> {}'.format(LOG_FILE), shell=True, stderr=subprocess.STDOUT).wait()
+            subprocess.call(command + ' >> {}'.format(LOG_FILE), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
         else:
-            subprocess.Popen(command, shell=True, stderr=subprocess.STDOUT).wait()
+            subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError as exc:
         print_formatted_text(BAD)
         print('ERROR:')
