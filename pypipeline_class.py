@@ -53,7 +53,10 @@ class PyPipeline:
         self.NONE = HTML('')
         self.F_PIPELINE = HTML('<teal>{}</teal>'.format(self.pipeline))
 
-        self.validate_config()
+        # Set up config-dependent variables
+        self.adapters = None
+        self.trim_6 = None
+        self._validate_config()
 
     def _run_command(self, message, command, log_output=False):
         formatted_message = '[{}] '.format(self.pipeline) + message + '... '
@@ -97,30 +100,30 @@ class PyPipeline:
             self._log_message('{} does not exist'.format(file_), command_status=self.EXITING)
             exit(1)
 
-    def validate_config(self):
+    def _validate_config(self):
         self._log_message('Performing config validation', command_status=self.NONE, end='', flush=True)
         self._validate_file(self.negative_references)
         self._validate_file(self.mature_references)
         self._validate_file(self.hairpin_references)
         self._validate_file(self.condition_file)
 
-        if self.company.upper() not in ['BC', 'TORONTO']:
+        if self.company.upper() == 'TORONTO':
+            self.adapters = self.toronto_adapters
+            self.trim_6 = False
+        elif self.company.upper() == 'BC':
+            self.adapters = self.bc_adapters
+            self.trim_6 = True
+        else:
             self._log_message('COMPANY must be "BC" or "TORONTO"', command_status=self.EXITING)
             exit(1)
 
-        if self.company.upper() == 'TORONTO':
-            adapters = self.toronto_adapters
-        else:
-            adapters = self.bc_adapters
-
-        if not os.path.isfile(adapters):
-            self._log_message('{} is missing, exiting'.format(adapters), command_status=self.EXITING)
+        if not os.path.isfile(self.adapters):
+            self._log_message('{} is missing, exiting'.format(self.adapters), command_status=self.EXITING)
             exit(1)
 
         print_formatted_text(self.GOOD)
 
-        files = '\n'.join(
-            [file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
+        files = '\n'.join([file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
         continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
         if not continue_:
             exit(0)
@@ -146,7 +149,6 @@ class PyPipeline:
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
             self._check_program(program)
-
 
 
 if __name__ == '__main__':
