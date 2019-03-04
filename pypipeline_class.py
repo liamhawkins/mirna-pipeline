@@ -24,8 +24,9 @@ class File:
         self.hairpin_basename = self._get_basename(self.hairpin_aligned_sam)
         self.mature_sorted = self._create_file('.sorted.bam', file=self.mature_aligned_bam)
         self.hairpin_sorted = self._create_file('.sorted.bam', file=self.hairpin_aligned_bam)
-        self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted)
-        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.mature_sorted)
+        readcount_dir = os.path.join(self.analysis_dir, 'read_counts/')
+        self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
+        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
@@ -34,13 +35,16 @@ class File:
     def _get_basename(path):
         return os.path.splitext(os.path.basename(path))[0].split('.')[0]
 
-    def _create_file(self, postfix, file=None):
+    def _create_file(self, postfix, file=None, dir=None):
         if file is None:
             basename = self.basename
         else:
             basename = self._get_basename(file)
 
-        return os.path.join(self.analysis_dir, basename + postfix)
+        if dir is None:
+            dir = self.analysis_dir
+
+        return os.path.join(dir, basename + postfix)
 
     def remove_intermediates(self):
         for file_ in [self.trimmed,
@@ -337,7 +341,7 @@ class PyPipeline:
         elif self.delete is None:
             self.delete = True
 
-        if not self.no_prompts:
+        if not self.no_prompts and self.fastqc is None:
             self.fastqc = yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
         elif self.fastqc is None:
             self.fastqc = True
