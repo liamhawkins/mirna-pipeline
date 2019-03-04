@@ -110,6 +110,12 @@ class PyPipeline:
         self.trim_6 = None
         self._validate_config()
 
+        self.raw_files = []
+        for dirpath, _, filenames in os.walk(self.raw_files_dir):
+            for f in filenames:
+                abs_path = os.path.abspath(os.path.join(dirpath, f))
+                self.raw_files.append(File(abs_path, self.analysis_dir))
+
     def _run_command(self, message, command, log_output=False):
         formatted_message = '[{}] '.format(self.pipeline) + message + '... '
         print(formatted_message, end='', flush=True)
