@@ -319,9 +319,9 @@ class PyPipeline:
         else:
             self._run_command(message, command)
 
-    def _run_successful(self):
-        # TODO
-        return True
+    def _run_successful(self, file):
+        # TODO Implement more thoroughly than just checking if file is empty
+        return os.stat(file.mature_readcount).st_size >= 0 and os.stat(file.hairpin_readcount).st_size >= 0
 
     def run(self):
         # Validate all required programs are installed
