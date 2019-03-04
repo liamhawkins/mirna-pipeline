@@ -7,6 +7,51 @@ from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import yes_no_dialog
 
 
+class File:
+    def __init__(self, raw_path, analysis_dir):
+        self.raw = raw_path
+        self.analysis_dir = analysis_dir
+        self.basename = self._get_basename(raw_path)
+        self.trimmed = self._create_file('.trimmed.fastq')
+        self.filtered = self._create_file('.filtered.fastq')
+        self.mature_aligned_sam = self._create_file('._MATURE.aligned.sam')
+        self.mature_aligned_bam = self._create_file('._MATURE.aligned.bam')
+        self.unaligned = self._create_file('.unaligned.fastq')
+        self.hairpin_aligned_sam = self._create_file('._HAIRPIN.aligned.sam')
+        self.hairpin_aligned_bam = self._create_file('._HAIRPIN.aligned.bam')
+        self.mature_sorted = self._create_file('.sorted.bam', file=self.mature_aligned_bam)
+        self.hairpin_sorted = self._create_file('.sorted.bam', file=self.hairpin_aligned_bam)
+        self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted)
+        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.mature_sorted)
+
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
+
+    @staticmethod
+    def _get_basename(path):
+        return os.path.splitext(os.path.basename(path))[0].split('.')[0]
+
+    def _create_file(self, postfix, file=None):
+        if file is None:
+            basename = self.basename
+        else:
+            basename = self._get_basename(file)
+
+        return os.path.join(self.analysis_dir, basename + postfix)
+
+    def remove_intermediates(self):
+        for file_ in [self.trimmed,
+                      self.filtered,
+                      self.mature_aligned_sam,
+                      self.mature_aligned_bam,
+                      self.unaligned,
+                      self.hairpin_aligned_sam,
+                      self.hairpin_aligned_bam,
+                      self.mature_sorted,
+                      self.hairpin_sorted]:
+            os.remove(file_)
+
+
 class PyPipeline:
     def __init__(self, config_file):
         # Read in Config File
