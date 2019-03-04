@@ -1,3 +1,5 @@
+# TODO: Validate all FASTQ files
+
 import os
 import subprocess
 from configparser import ConfigParser
@@ -25,6 +27,7 @@ class File:
         self.mature_sorted = self._create_file('.sorted.bam', file=self.mature_aligned_bam)
         self.hairpin_sorted = self._create_file('.sorted.bam', file=self.hairpin_aligned_bam)
         readcount_dir = os.path.join(self.analysis_dir, 'read_counts/')
+        os.makedirs(readcount_dir, exist_ok=True)
         self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
         self.hairpin_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
 
