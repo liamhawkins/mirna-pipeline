@@ -13,12 +13,15 @@ class File:
         self.analysis_dir = analysis_dir
         self.basename = self._get_basename(raw_path)
         self.trimmed = self._create_file('.trimmed.fastq')
+        self.temp = self._create_file('.tmp.fastq')
         self.filtered = self._create_file('.filtered.fastq')
         self.mature_aligned_sam = self._create_file('._MATURE.aligned.sam')
         self.mature_aligned_bam = self._create_file('._MATURE.aligned.bam')
         self.unaligned = self._create_file('.unaligned.fastq')
         self.hairpin_aligned_sam = self._create_file('._HAIRPIN.aligned.sam')
         self.hairpin_aligned_bam = self._create_file('._HAIRPIN.aligned.bam')
+        self.mature_basename = self._get_basename(self.mature_aligned_sam)
+        self.hairpin_basename = self._get_basename(self.hairpin_aligned_sam)
         self.mature_sorted = self._create_file('.sorted.bam', file=self.mature_aligned_bam)
         self.hairpin_sorted = self._create_file('.sorted.bam', file=self.hairpin_aligned_bam)
         self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted)
@@ -49,7 +52,13 @@ class File:
                       self.hairpin_aligned_bam,
                       self.mature_sorted,
                       self.hairpin_sorted]:
-            os.remove(file_)
+            try:
+                os.remove(file_)
+            except FileNotFoundError:
+                pass
+
+    def read_counts_exist(self):
+        return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
 
 
 class PyPipeline:
