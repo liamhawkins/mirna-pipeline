@@ -53,9 +53,9 @@ class File:
 
 
 class PyPipeline:
-    def __init__(self, config_file, debug=False):
-        self.debug = debug
-        self.delete = True
+    def __init__(self, config_file, no_prompts=False, fastqc=None):
+        self.no_prompts = no_prompts
+        self.fastqc = fastqc
 
         # Read in Config File
         config = ConfigParser()
@@ -182,18 +182,10 @@ class PyPipeline:
         print_formatted_text(self.GOOD)
 
         files = '\n'.join([file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
-        if not self.debug:
+        if not self.no_prompts:
             continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
-        else:
-            print(files)
-            prompt = input('Are these the files you want to process?')
-            if prompt.lower() in ['y', 'yes']:
-                continue_ = True
-            else:
-                continue_ = False
-
-        if not continue_:
-            exit(0)
+            if not continue_:
+                exit(0)
 
     def _check_program(self, program):
         self._log_message('Checking that {} is installed'.format(program), command_status=self.NONE, end='', flush=True)
@@ -243,7 +235,25 @@ class PyPipeline:
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
             self._check_program(program)
 
+        self._build_index(self.negative_index_dir, 'negative')
+        self._build_index(self.mature_index_dir, 'mature')
+        self._build_index(self.hairpin_index_dir, 'hairpin')
+
+        if not self.no_prompts:
+            self.delete = yes_no_dialog(title='Delete files', text='Do you want to delete intermediate files?')
+        else:
+            self.delete = True
+
+        if not self.no_prompts:
+            self.fastqc = yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
+        elif self.fastqc is None:
+            self.fastqc = True
+
+        if self.fastqc:
+            for file in self.raw_files:
+                self._fastqc_check(file)
+
 
 if __name__ == '__main__':
-    pipeline = PyPipeline('config.ini', debug=True)
+    pipeline = PyPipeline('config.ini', no_prompts=True, fastqc=False)
     pipeline.run()
