@@ -116,8 +116,8 @@ class PyPipeline:
                 self.files.append(File(abs_path, self.analysis_dir))
 
     def _run_command(self, message, command, log_output=False):
-        formatted_message = '[{}] '.format(self.pipeline) + message + '... '
-        print(formatted_message, end='', flush=True)
+        formatted_message = '[{}] '.format(self.F_PIPELINE.value) + message + '... '
+        print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
             f.write(formatted_message)
 
@@ -141,7 +141,7 @@ class PyPipeline:
         if command_status is None:
             command_status = self.GOOD
 
-        formatted_message = '[{}] '.format(self.pipeline) + message + '... '
+        formatted_message = '[{}] '.format(self.F_PIPELINE.value) + message + '... '
         print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
         with open(self.log_file, 'a') as f:
