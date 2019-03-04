@@ -29,7 +29,7 @@ class File:
         readcount_dir = os.path.join(self.analysis_dir, 'read_counts/')
         os.makedirs(readcount_dir, exist_ok=True)
         self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
-        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
+        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
