@@ -209,6 +209,35 @@ class PyPipeline:
                 self._log_message('An unknown error occurred when looking for {}'.format(program), command_status=self.BAD)
                 raise
 
+    def _index_is_built(self, ind_prefix, index_name):
+        try:
+            os.listdir(os.path.dirname(ind_prefix))
+        except FileNotFoundError:
+            self._log_message('Checking if {} index is built'.format(index_name), command_status=self.NOT_BUILT)
+            return False
+
+        for filename in os.listdir(ind_prefix):
+            if not filename.startswith(os.path.basename(ind_prefix)) or not filename.endswith('.ebwt'):
+                self._log_message('Checking if {} index is built'.format(index_name), command_status=self.NOT_BUILT)
+                return False
+
+        self._log_message('Checking if {} index is built'.format(index_name))
+        return True
+
+    def _build_index(self, index_dir, index_name):
+        if not self._index_is_built(index_dir, index_name):
+            os.makedirs(index_dir, exist_ok=True)
+
+            message = 'Building negative index'
+            command = 'bowtie-build {} {}'.format(self.negative_references, os.path.join(index_dir, os.path.basename(index_dir)))
+            self._run_command(message, command)
+
+    def _fastqc_check(self, file):
+        os.makedirs(self.fastqc_dir, exist_ok=True)
+        message = 'Performing fastqc check on {}'.format(file.basename)
+        command = 'fastqc -q {} -o {}'.format(file.raw, self.fastqc_dir)
+        self._run_command(message, command)
+
     def run(self):
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
