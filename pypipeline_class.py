@@ -53,9 +53,10 @@ class File:
 
 
 class PyPipeline:
-    def __init__(self, config_file, no_prompts=False, fastqc=None):
+    def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
         self.no_prompts = no_prompts
         self.fastqc = fastqc
+        self.delete = delete
 
         # Read in Config File
         config = ConfigParser()
@@ -241,7 +242,7 @@ class PyPipeline:
 
         if not self.no_prompts:
             self.delete = yes_no_dialog(title='Delete files', text='Do you want to delete intermediate files?')
-        else:
+        elif self.delete is None:
             self.delete = True
 
         if not self.no_prompts:
