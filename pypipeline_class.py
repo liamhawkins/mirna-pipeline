@@ -63,6 +63,7 @@ class File:
 
 class PyPipeline:
     def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
+        self.pipeline = 'MicroRNA-seq PyPipeline'
         self.no_prompts = no_prompts
         self.fastqc = fastqc
         self.delete = delete
@@ -79,28 +80,16 @@ class PyPipeline:
         self.negative_references = config['NEGATIVE_REFERENCE_FILE']
         self.mature_references = config['MATURE_REFERENCE_FILE']
         self.hairpin_references = config['HAIRPIN_REFERENCE_FILE']
+        self.bowtie_dir = config['BOWTIE_DIR']
         self.condition_file = config['CONDITION_FILE']
         self.control_name = config['CONTROL_NAME']
 
         # Set up directories
-        self.pipeline = 'MicroRNA-seq PyPipeline'
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
         self.fastqc_dir = os.path.join(self.analysis_dir, 'fastqc/')
-        self.trimmed_dir = os.path.join(self.analysis_dir, 'trimmed/')
-        self.adapter_dir = os.path.join(self.analysis_dir, 'adapters/')
-        self.bowtie_dir = os.path.join('/home/student/Desktop/pypipeline', 'bowtie_index/')
         self.negative_index_dir = os.path.join(self.bowtie_dir, 'neg_ref')
         self.hairpin_index_dir = os.path.join(self.bowtie_dir, 'hp_ref')
         self.mature_index_dir = os.path.join(self.bowtie_dir, 'mature_ref')
-        self.filtered_dir = os.path.join(self.analysis_dir, 'filtered/')
-        self.mature_dir = os.path.join(self.analysis_dir, 'matures/')
-        self.mature_aligned_dir = os.path.join(self.mature_dir, 'aligned/')
-        self.mature_unaligned_dir = os.path.join(self.mature_dir, 'unaligned/')
-        self.hairpin_dir = os.path.join(self.analysis_dir, 'hairpins/')
-        self.hairpin_aligned_dir = os.path.join(self.hairpin_dir, 'aligned/')
-        self.read_count_dir = os.path.join(self.analysis_dir, 'read_counts/')
-        self.mature_read_count_dir = os.path.join(self.read_count_dir, 'mature/')
-        self.hairpin_read_count_dir = os.path.join(self.read_count_dir, 'hairpin/')
 
         # Formatted strings
         self.GOOD = HTML('<green>GOOD</green>')
@@ -120,11 +109,11 @@ class PyPipeline:
         self.trim_6 = None
         self._validate_config()
 
-        self.raw_files = []
+        self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
             for f in filenames:
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
-                self.raw_files.append(File(abs_path, self.analysis_dir))
+                self.files.append(File(abs_path, self.analysis_dir))
 
     def _run_command(self, message, command, log_output=False):
         formatted_message = '[{}] '.format(self.pipeline) + message + '... '
@@ -240,6 +229,100 @@ class PyPipeline:
         command = 'fastqc -q {} -o {}'.format(file.raw, self.fastqc_dir)
         self._run_command(message, command)
 
+    def _trim_adapters(self, file):
+        message = '{}: Trimming adapters'.format(file.basename)
+        command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(self.adapters, file.raw, file.temp)
+        if os.path.exists(file.trimmed):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command, log_output=True)
+
+            if self.trim_6:
+                message = '{}: Trimming 6 nucleotides'.format(file.basename)
+                command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(file.temp, file.trimmed)
+                self._run_command(message, command, log_output=True)
+                os.remove(file.temp)
+            else:
+                os.rename(file.temp, file.trimmed)
+
+    def _filter_out_neg(self, file):
+        negative_index = os.path.join(self.negative_index_dir, os.path.basename(self.negative_index_dir))
+
+        message = '{}: Filtering negative RNA species'.format(file.basename)
+        command = 'bowtie -p 18 --quiet -q {} {} --un {}'.format(negative_index, file.trimmed, file.filtered)
+        if os.path.exists(file.filtered):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command, log_output=True)
+
+    def _align_reads(self, file):
+        mature_index = os.path.join(self.mature_index_dir, os.path.basename(self.mature_index_dir))
+        hairpin_index = os.path.join(self.hairpin_index_dir, os.path.basename(self.hairpin_index_dir))
+
+        message = '{}: Aligning to mature index'.format(file.basename)
+        command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(
+            mature_index, file.filtered, file.mature_aligned_sam, file.unaligned)
+        if os.path.exists(file.mature_aligned_sam) and os.path.exists(file.unaligned):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command, log_output=True)
+
+        message = '{}: Converting SAM to BAM'.format(file.basename)
+        command = 'samtools view -S -b {} > {}'.format(file.mature_aligned_sam, file.mature_aligned_bam)
+        if os.path.exists(file.mature_aligned_bam):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+        message = '{}: Aligning to hairpin index'.format(file.basename)
+        command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, file.unaligned, file.hairpin_aligned_sam)
+        if os.path.exists(file.hairpin_aligned_sam):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command, log_output=True)
+
+        message = '{}: Converting SAM to BAM'.format(file.basename)
+        command = 'samtools view -S -b {} > {}'.format(file.hairpin_aligned_sam, file.hairpin_aligned_bam)
+        if os.path.exists(file.hairpin_aligned_bam):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+    def _get_read_counts(self, file):
+        message = '{}: Sorting BAM'.format(file.mature_basename)
+        command = 'samtools sort -n {} -o {}'.format(file.mature_aligned_bam, file.mature_sorted)
+        if os.path.exists(file.mature_sorted):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+        message = '{}: Generating read count file'.format(file.mature_basename)
+        command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
+            sorted_file_bam=file.mature_sorted, readcount_file=file.mature_readcount)
+        if os.path.exists(file.mature_readcount):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+        message = '{}: Sorting BAM'.format(file.hairpin_basename)
+        command = 'samtools sort -n {} -o {}'.format(file.hairpin_aligned_bam, file.hairpin_sorted)
+        if os.path.exists(file.hairpin_sorted):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+        message = '{}: Generating read count file'.format(file.hairpin_basename)
+        command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
+            sorted_file_bam=file.hairpin_sorted, readcount_file=file.hairpin_readcount)
+        if os.path.exists(file.hairpin_readcount):
+            self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
+        else:
+            self._run_command(message, command)
+
+    def _run_successful(self):
+        # TODO
+        return True
+
     def run(self):
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
@@ -260,8 +343,30 @@ class PyPipeline:
             self.fastqc = True
 
         if self.fastqc:
-            for file in self.raw_files:
+            for file in self.files:
                 self._fastqc_check(file)
+
+        # Main file processing steps
+        for file in self.files:
+            if not file.read_counts_exist():
+                self._trim_adapters(file)
+                self._filter_out_neg(file)
+                self._align_reads(file)
+                self._get_read_counts(file)
+
+            if self.delete and self._run_successful(file):
+                self._log_message('{}: Deleting intermediate files'.format(file.basename))
+                file.remove_intermediates()
+                self._log_message('Clearing log file')
+                open(self.log_file, 'w').close()
+            elif not self._run_successful(file):
+                self._log_message('{}: Run was not successful'.format(file.basename), command_status=self.EXITING)
+                exit(1)
+            else:
+                pass
+
+        self._log_message('Deleting log file')
+        os.remove(self.log_file)
 
 
 if __name__ == '__main__':
