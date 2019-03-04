@@ -101,6 +101,10 @@ class PyPipeline:
         self.NONE = HTML('')
         self.F_PIPELINE = HTML('<teal>{}</teal>'.format(self.pipeline))
 
+        # Create log file
+        os.makedirs(self.analysis_dir, exist_ok=True)
+        self._create_log_file()
+
         # Set up config-dependent variables
         self.adapters = None
         self.trim_6 = None
@@ -200,9 +204,6 @@ class PyPipeline:
                 raise
 
     def run(self):
-        os.makedirs(self.analysis_dir, exist_ok=True)
-        self._create_log_file()
-
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
             self._check_program(program)
