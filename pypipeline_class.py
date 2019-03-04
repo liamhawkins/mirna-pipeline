@@ -111,7 +111,7 @@ class PyPipeline:
 
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
-            for f in filenames:
+            for f in sorted(filenames):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
                 self.files.append(File(abs_path, self.analysis_dir))
 
