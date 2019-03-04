@@ -53,7 +53,10 @@ class File:
 
 
 class PyPipeline:
-    def __init__(self, config_file):
+    def __init__(self, config_file, debug=False):
+        self.debug = debug
+        self.delete = True
+
         # Read in Config File
         config = ConfigParser()
         config.read(config_file)
@@ -169,7 +172,16 @@ class PyPipeline:
         print_formatted_text(self.GOOD)
 
         files = '\n'.join([file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
-        continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
+        if not self.debug:
+            continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
+        else:
+            print(files)
+            prompt = input('Are these the files you want to process?')
+            if prompt.lower() in ['y', 'yes']:
+                continue_ = True
+            else:
+                continue_ = False
+
         if not continue_:
             exit(0)
 
@@ -197,5 +209,5 @@ class PyPipeline:
 
 
 if __name__ == '__main__':
-    pipeline = PyPipeline('config.ini')
+    pipeline = PyPipeline('config.ini', debug=True)
     pipeline.run()
