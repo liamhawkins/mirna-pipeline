@@ -162,7 +162,7 @@ class PyPipeline:
         self._validate_file(self.negative_references)
         self._validate_file(self.mature_references)
         self._validate_file(self.hairpin_references)
-        self._validate_file(self.condition_file)
+        # self._validate_file(self.condition_file) # TODO: Implement checking for config file when RSCRIPT is added
 
         if self.company.upper() == 'TORONTO':
             self.adapters = self.toronto_adapters
@@ -354,16 +354,19 @@ class PyPipeline:
                 self._align_reads(file)
                 self._get_read_counts(file)
 
-            if self.delete and self._run_successful(file):
-                self._log_message('{}: Deleting intermediate files'.format(file.basename))
-                file.remove_intermediates()
-                self._log_message('Clearing log file')
-                open(self.log_file, 'w').close()
-            elif not self._run_successful(file):
-                self._log_message('{}: Run was not successful'.format(file.basename), command_status=self.EXITING)
-                exit(1)
+                if self.delete and self._run_successful(file):
+                    self._log_message('{}: Deleting intermediate files'.format(file.basename))
+                    file.remove_intermediates()
+                    self._log_message('Clearing log file')
+                    open(self.log_file, 'w').close()
+                elif not self._run_successful(file):
+                    self._log_message('{}: Run was not successful'.format(file.basename), command_status=self.EXITING)
+                    exit(1)
+                else:
+                    pass
+
             else:
-                pass
+                self._log_message('{}: Read counts already created'.format(file.basename), command_status=self.FILE_ALREADY_EXISTS)
 
         self._log_message('Deleting log file')
         os.remove(self.log_file)
