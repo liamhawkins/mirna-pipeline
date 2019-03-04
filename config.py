@@ -11,7 +11,7 @@ RAW_FILES_DIR='/home/student/Desktop/nmranalysis/raw_files'
 PREFIX='NMRBRN'
 
 # Specify files containing TORONTO and BC adapters
-TORONTO_ADAPTERS = '/home/student/Desktop/pypipeline/reference_sequences/illumina_adapters.fasta'
+TORONTO_ADAPTERS = '/home/student/Desktop/pypipeline/reference_sequences/toronto_adapters.fasta'
 BC_ADAPTERS = '/home/student/Desktop/pypipeline/reference_sequences/bc_adapters.fasta'
 
 # Specify files containing Negative, Mature, and Hairpin reference sequences
