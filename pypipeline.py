@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # TODO: Validate all FASTQ files
 
 import os
@@ -88,8 +90,8 @@ class PyPipeline:
         self.mature_references = config['MATURE_REFERENCE_FILE']
         self.hairpin_references = config['HAIRPIN_REFERENCE_FILE']
         self.bowtie_dir = config['BOWTIE_DIR']
-        self.condition_file = config['CONDITION_FILE']
-        self.control_name = config['CONTROL_NAME']
+        # self.condition_file = config['CONDITION_FILE']
+        # self.control_name = config['CONTROL_NAME']
 
         # Set up directories
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
@@ -326,7 +328,8 @@ class PyPipeline:
         else:
             self._run_command(message, command)
 
-    def _run_successful(self, file):
+    @staticmethod
+    def _run_successful(file):
         # TODO Implement more thoroughly than just checking if file is empty
         return os.stat(file.mature_readcount).st_size >= 0 and os.stat(file.hairpin_readcount).st_size >= 0
 
