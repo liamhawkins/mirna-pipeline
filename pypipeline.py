@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
 # TODO: Validate all FASTQ files
-
+import csv
 import os
+import shutil
 import subprocess
 from configparser import ConfigParser
 from datetime import datetime
@@ -79,7 +80,9 @@ class PyPipeline:
 
         # Read in Config File
         config = ConfigParser()
+        config.optionxform = str  # Have to replace optionxform function with str to preserve case sensitivity
         config.read(config_file)
+        self.sample_conditions = {k: v for (k, v) in config['sample_conditions'].items()}
         config = config[config.sections()[0]]
         self.company = config['COMPANY']
         self.analysis_dir = config['ANALYSIS_DIR']
@@ -90,8 +93,11 @@ class PyPipeline:
         self.mature_references = config['MATURE_REFERENCE_FILE']
         self.hairpin_references = config['HAIRPIN_REFERENCE_FILE']
         self.bowtie_dir = config['BOWTIE_DIR']
-        # self.condition_file = config['CONDITION_FILE']
-        # self.control_name = config['CONTROL_NAME']
+        self.kegg_id_file = config['KEGG_ID_FILE']
+        self.go_bp_id_file = config['GO_BP_ID_FILE']
+        self.go_mf_id_file = config['GO_MF_ID_FILE']
+        self.go_cc_id_file = config['GO_CC_ID_FILE']
+        self.rpipeline = config['R_SCRIPT']
 
         # Set up directories
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
@@ -99,6 +105,8 @@ class PyPipeline:
         self.negative_index_dir = os.path.join(self.bowtie_dir, 'neg_ref')
         self.hairpin_index_dir = os.path.join(self.bowtie_dir, 'hp_ref')
         self.mature_index_dir = os.path.join(self.bowtie_dir, 'mature_ref')
+        self.r_dir = os.path.join(self.analysis_dir, 'r/')
+        self.conditions_file = os.path.join(self.r_dir, 'conditions.csv')
 
         # Formatted strings
         self.GOOD = HTML('<green>GOOD</green>')
@@ -113,16 +121,16 @@ class PyPipeline:
         os.makedirs(self.analysis_dir, exist_ok=True)
         self._create_log_file()
 
-        # Set up config-dependent variables
-        self.adapters = None
-        self.trim_6 = None
-        self._validate_config()
-
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
             for f in sorted(filenames):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
                 self.files.append(File(abs_path, self.analysis_dir))
+
+        # Set up config-dependent variables
+        self.adapters = None
+        self.trim_6 = None
+        self._validate_config()
 
     def _run_command(self, message, command, log_output=False):
         formatted_message = '[{}] '.format(self.F_PIPELINE.value) + message + '... '
@@ -166,12 +174,18 @@ class PyPipeline:
             self._log_message('{} does not exist'.format(file_), command_status=self.EXITING)
             exit(1)
 
+    def _validate_sample_conditions(self):
+        for file in self.files:
+            if file.basename not in self.sample_conditions.keys():
+                self._log_message('Cannot find sample condition in config file: {}'.format(file.basename), command_status=self.EXITING)
+                exit(1)
+
+        if set(self.sample_conditions.values()) != set(['control', 'stress']):
+            self._log_message('Sample conditions can only be "control" or "stress" at this time', command_status=self.EXITING)
+            exit(1)
+
     def _validate_config(self):
         self._log_message('Performing config validation', command_status=self.NONE, end='', flush=True)
-        self._validate_file(self.negative_references)
-        self._validate_file(self.mature_references)
-        self._validate_file(self.hairpin_references)
-        # self._validate_file(self.condition_file) # TODO: Implement checking for config file when RSCRIPT is added
 
         if self.company.upper() == 'TORONTO':
             self.adapters = self.toronto_adapters
@@ -183,9 +197,15 @@ class PyPipeline:
             self._log_message('COMPANY must be "BC" or "TORONTO"', command_status=self.EXITING)
             exit(1)
 
-        if not os.path.isfile(self.adapters):
-            self._log_message('{} is missing, exiting'.format(self.adapters), command_status=self.EXITING)
-            exit(1)
+        self._validate_file(self.adapters)
+        self._validate_file(self.negative_references)
+        self._validate_file(self.mature_references)
+        self._validate_file(self.hairpin_references)
+        self._validate_file(self.kegg_id_file)
+        self._validate_file(self.go_bp_id_file)
+        self._validate_file(self.go_mf_id_file)
+        self._validate_file(self.go_cc_id_file)
+        self._validate_file(self.rpipeline)
 
         print_formatted_text(self.GOOD)
 
@@ -194,6 +214,8 @@ class PyPipeline:
             continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
             if not continue_:
                 exit(0)
+
+        self._validate_sample_conditions()
 
     def _check_program(self, program):
         self._log_message('Checking that {} is installed'.format(program), command_status=self.NONE, end='', flush=True)
@@ -381,7 +403,71 @@ class PyPipeline:
         self._log_message('Deleting log file')
         os.remove(self.log_file)
 
+    def _create_conditions_file(self):
+        tmp_list = sorted([[sample, condition] for (sample, condition) in self.sample_conditions.items()])
+        csv_data = [['sample', 'condition']]
+        csv_data.extend(tmp_list)
+
+        with open(self.conditions_file, 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerows(csv_data)
+
+        csv_file.close()
+
+    def _copy_read_counts(self):
+        for file in self.files:
+            shutil.copy(file.mature_readcount, self.r_dir)
+
+    def _run_rscript(self):
+        message = 'Running R analyis'
+        command = 'Rscript {rpipeline} {wd} {kegg_ids} {go_bp_ids} {go_mf_ids} {go_cc_ids}'.format(rpipeline=self.rpipeline,
+                                                                                                   wd=self.r_dir,
+                                                                                                   kegg_ids=self.kegg_id_file,
+                                                                                                   go_bp_ids=self.go_bp_id_file,
+                                                                                                   go_mf_ids=self.go_mf_id_file,
+                                                                                                   go_cc_ids=self.go_cc_id_file)
+        self._run_command(message, command)
+
+    def analyze(self):
+        os.makedirs(self.r_dir, exist_ok=True)
+
+        # Validate the sample conditions specified in config match specific files
+        self._validate_sample_conditions()
+
+        self._copy_read_counts()
+
+        # "conditions.csv" files must be made for rbiomir
+        self._create_conditions_file()
+
+        self._run_rscript()
+
 
 if __name__ == '__main__':
+    # configs = ['configs/13lgsbat.ini',
+    #            'configs/13lgskid.ini',
+    #            'configs/13lgspanc.ini',
+    #            'configs/13lgswat.ini',
+    #            'configs/batmus.ini',
+    #            'configs/bearwat.ini',
+    #            'configs/cpmliv.ini',
+    #            'configs/dormouseliv.ini',
+    #            'configs/hylaliv.ini',
+    #            'configs/lemurheart.ini',
+    #            'configs/lemurmus.ini',
+    #            'configs/lithep.ini',
+    #            'configs/nmrbrain.ini',
+    #            'configs/nmrheart.ini',
+    #            'configs/rsyeggs.ini',
+    #            'configs/tseliver.ini',
+    #            'configs/wstheart.ini',
+    #            'configs/xenheart.ini']
+    #
+    # pipelines = {}
+    #
+    # for config in configs:
+    #     pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=True)
+    #
+    # for pipeline in pipelines.values():
+    #     pipeline.run()
     pipeline = PyPipeline('config.ini', no_prompts=True, fastqc=False)
-    pipeline.run()
+    pipeline.analyze()
