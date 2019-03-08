@@ -3,6 +3,7 @@
 # TODO: Validate all FASTQ files
 import csv
 import os
+import re
 import shutil
 import subprocess
 from configparser import ConfigParser
@@ -105,8 +106,9 @@ class PyPipeline:
         self.negative_index_dir = os.path.join(self.bowtie_dir, 'neg_ref')
         self.hairpin_index_dir = os.path.join(self.bowtie_dir, 'hp_ref')
         self.mature_index_dir = os.path.join(self.bowtie_dir, 'mature_ref')
-        self.r_dir = os.path.join(self.analysis_dir, 'r/')
-        self.conditions_file = os.path.join(self.r_dir, 'conditions.csv')
+        self.figures = os.path.join(self.analysis_dir, 'figures/')
+        self.mirna_targets_dir = os.path.join(self.figures, 'mirna_targets/')
+        self.conditions_file = os.path.join(self.figures, 'conditions.csv')
 
         # Formatted strings
         self.GOOD = HTML('<green>GOOD</green>')
@@ -416,20 +418,36 @@ class PyPipeline:
 
     def _copy_read_counts(self):
         for file in self.files:
-            shutil.copy(file.mature_readcount, self.r_dir)
+            shutil.copy(file.mature_readcount, self.figures)
 
     def _run_rscript(self):
         message = 'Running R analyis'
         command = 'Rscript {rpipeline} {wd} {kegg_ids} {go_bp_ids} {go_mf_ids} {go_cc_ids}'.format(rpipeline=self.rpipeline,
-                                                                                                   wd=self.r_dir,
+                                                                                                   wd=self.figures,
                                                                                                    kegg_ids=self.kegg_id_file,
                                                                                                    go_bp_ids=self.go_bp_id_file,
                                                                                                    go_mf_ids=self.go_mf_id_file,
                                                                                                    go_cc_ids=self.go_cc_id_file)
-        self._run_command(message, command)
+        self._run_command(message, command, log_output=True)
+
+    def _move_files_by_regex(self, source, dest=None, pattern=None):
+        for f in os.listdir(source):
+            if re.search(pattern, f):
+                if dest is None:
+                    os.remove(os.path.join(source, f))
+                else:
+                    os.rename(os.path.join(source, f), os.path.join(dest, f))
+
+    def _clean_up(self):
+        self._log_message('Cleaning up directories')
+        os.remove(self.conditions_file)
+        os.remove(self.log_file)
+        self._move_files_by_regex(source=self.figures, dest=self.mirna_targets_dir, pattern='hsa.*\.csv')
+        self._move_files_by_regex(source=self.figures, dest=None, pattern='.*read_count.txt')
 
     def analyze(self):
-        os.makedirs(self.r_dir, exist_ok=True)
+        os.makedirs(self.figures, exist_ok=True)
+        os.makedirs(self.mirna_targets_dir, exist_ok=True)
 
         # Validate the sample conditions specified in config match specific files
         self._validate_sample_conditions()
@@ -440,6 +458,8 @@ class PyPipeline:
         self._create_conditions_file()
 
         self._run_rscript()
+
+        self._clean_up()
 
 
 if __name__ == '__main__':
@@ -470,4 +490,5 @@ if __name__ == '__main__':
     # for pipeline in pipelines.values():
     #     pipeline.run()
     pipeline = PyPipeline('config.ini', no_prompts=True, fastqc=False)
+    pipeline.run()
     pipeline.analyze()
