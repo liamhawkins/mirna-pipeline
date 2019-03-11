@@ -393,19 +393,13 @@ class PyPipeline:
                 if self.delete and self._run_successful(file):
                     self._log_message('{}: Deleting intermediate files'.format(file.basename))
                     file.remove_intermediates()
-                    self._log_message('Clearing log file')
-                    open(self.log_file, 'w').close()
                 elif not self._run_successful(file):
                     self._log_message('{}: Run was not successful'.format(file.basename), command_status=self.EXITING)
                     exit(1)
                 else:
                     pass
-
             else:
                 self._log_message('{}: Read counts already created'.format(file.basename), command_status=self.FILE_ALREADY_EXISTS)
-
-        self._log_message('Deleting log file')
-        os.remove(self.log_file)
 
     def _create_conditions_file(self):
         tmp_list = sorted([[sample, condition] for (sample, condition) in self.sample_conditions.items()])
@@ -443,7 +437,6 @@ class PyPipeline:
     def _clean_up(self):
         self._log_message('Cleaning up directories')
         os.remove(self.conditions_file)
-        os.remove(self.log_file)
         self._move_files_by_regex(source=self.figures, dest=self.mirna_targets_dir, pattern='hsa.*\.csv')
         self._move_files_by_regex(source=self.figures, dest=None, pattern='.*read_count.txt')
 
