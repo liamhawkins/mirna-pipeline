@@ -74,7 +74,7 @@ class File:
 
 class PyPipeline:
     def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
-        self.pipeline = 'MicroRNA-seq PyPipeline'
+        self.pipeline = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
         self.fastqc = fastqc
         self.delete = delete
