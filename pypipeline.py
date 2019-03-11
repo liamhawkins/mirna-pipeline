@@ -79,11 +79,11 @@ class File:
             raise ValueError('bowtie_step must be "filtering", "mature", or "hairpin"')
 
         if bowtie_step == 'filtering':
-            self.filtering_bowtie_summary = tail(log_file, 5)
+            self.filtering_bowtie_summary = tail(log_file, 4)
         elif bowtie_step == 'mature':
-            self.mature_bowtie_summary = tail(log_file, 5)
+            self.mature_bowtie_summary = tail(log_file, 4)
         else:
-            self.hairpin_bowtie_summary = tail(log_file, 5)
+            self.hairpin_bowtie_summary = tail(log_file, 4)
 
     def remove_intermediates(self):
         for file_ in [self.trimmed,
@@ -106,13 +106,13 @@ class File:
     def write_summary(self, summary_file):
         with open(summary_file, 'a') as f:
             f.write('########## {} Processing Summary ##########\n'.format(self.basename))
-            f.write('Adapter Trimming Results')
+            f.write('Adapter Trimming Results\n')
             for line in self.trim_summary:
                 f.write(line.replace('\n', '') + '\n')
-            f.write('\nMature Aligning Results')
+            f.write('\nMature Aligning Results\n')
             for line in self.mature_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
-            f.write('\nHairpin Aligning Results')
+            f.write('\nHairpin Aligning Results\n')
             for line in self.hairpin_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\n')
