@@ -284,7 +284,7 @@ class PyPipeline:
         negative_index = os.path.join(self.negative_index_dir, os.path.basename(self.negative_index_dir))
 
         message = '{}: Filtering negative RNA species'.format(file.basename)
-        command = 'bowtie -p 18 --quiet -q {} {} --un {}'.format(negative_index, file.trimmed, file.filtered)
+        command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, file.trimmed, file.filtered)
         if os.path.exists(file.filtered):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
@@ -295,7 +295,7 @@ class PyPipeline:
         hairpin_index = os.path.join(self.hairpin_index_dir, os.path.basename(self.hairpin_index_dir))
 
         message = '{}: Aligning to mature index'.format(file.basename)
-        command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(
+        command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(
             mature_index, file.filtered, file.mature_aligned_sam, file.unaligned)
         if os.path.exists(file.mature_aligned_sam) and os.path.exists(file.unaligned):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
@@ -310,7 +310,7 @@ class PyPipeline:
             self._run_command(message, command)
 
         message = '{}: Aligning to hairpin index'.format(file.basename)
-        command = 'bowtie -p 18 --quiet -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, file.unaligned, file.hairpin_aligned_sam)
+        command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, file.unaligned, file.hairpin_aligned_sam)
         if os.path.exists(file.hairpin_aligned_sam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
