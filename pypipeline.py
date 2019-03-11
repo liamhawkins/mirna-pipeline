@@ -107,12 +107,15 @@ class File:
         with open(summary_file, 'a') as f:
             f.write('########## {} Processing Summary ##########\n'.format(self.basename))
             f.write('Adapter Trimming Results\n')
+            f.write('------------------------\n')
             for line in self.trim_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\nMature Aligning Results\n')
+            f.write('-------------------------\n')
             for line in self.mature_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\nHairpin Aligning Results\n')
+            f.write('--------------------------\n')
             for line in self.hairpin_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\n')
@@ -120,7 +123,7 @@ class File:
 
 class PyPipeline:
     def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
-        self.pipeline = datetime.now().strftime("%Y-%m-%d %H:%M")
+        self.pipeline = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
         self.fastqc = fastqc
         self.delete = delete
@@ -164,7 +167,7 @@ class PyPipeline:
         self.BAD = HTML('<red>BAD</red>')
         self.EXITING = HTML('<red>EXITING</red>')
         self.NONE = HTML('')
-        self.F_PIPELINE = '<teal>{}</teal>'.format(self.pipeline)
+        self.F_PIPELINE = lambda: '<teal>{}</teal>'.format(self.pipeline())
 
         # Create log file
         os.makedirs(self.analysis_dir, exist_ok=True)
@@ -183,8 +186,8 @@ class PyPipeline:
         self._validate_config()
 
     def _run_command(self, message, command, log_stdout=False, log_stderr=False):
-        formatted_message = '[{}] '.format(self.F_PIPELINE) + message + '... '
-        unformated_message = '[{}] '.format(self.pipeline) + message + '... '
+        formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
+        unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
         print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
             f.write(unformated_message + '\n')
@@ -212,8 +215,8 @@ class PyPipeline:
         if command_status is None:
             command_status = self.GOOD
 
-        formatted_message = '[{}] '.format(self.F_PIPELINE) + message + '... '
-        unformated_message = '[{}] '.format(self.pipeline) + message + '... '
+        formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
+        unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
         print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
         with open(self.log_file, 'a') as f:
