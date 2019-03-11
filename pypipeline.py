@@ -13,6 +13,11 @@ from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import yes_no_dialog
 
 
+def tail(f, n):
+    proc = subprocess.Popen(['tail', '-n', str(n), f], stdout=subprocess.PIPE)
+    return [line.decode("utf-8") for line in proc.stdout.readlines()]
+
+
 class File:
     def __init__(self, raw_path, analysis_dir):
         self.raw = raw_path
@@ -34,6 +39,10 @@ class File:
         os.makedirs(readcount_dir, exist_ok=True)
         self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
         self.hairpin_readcount = self._create_file('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
+        self.trim_summary = []
+        self.filtering_bowtie_summary = []
+        self.mature_bowtie_summary = []
+        self.hairpin_bowtie_summary = []
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
@@ -53,6 +62,29 @@ class File:
 
         return os.path.join(dir, basename + postfix)
 
+    def get_trim_summary(self, log_file):
+        summary_header_found = False
+        with open(log_file, 'r') as f:
+            for line in f:
+                if line.startswith('=== Summary ==='):
+                    summary_header_found = True
+                elif summary_header_found and line != '\n':
+                    if line.startswith('==='):
+                        break
+                    else:
+                        self.trim_summary.append(line)
+
+    def get_bowtie_summary(self, log_file, bowtie_step):
+        if bowtie_step not in ['filtering', 'mature', 'hairpin']:
+            raise ValueError('bowtie_step must be "filtering", "mature", or "hairpin"')
+
+        if bowtie_step == 'filtering':
+            self.filtering_bowtie_summary = tail(log_file, 5)
+        elif bowtie_step == 'mature':
+            self.mature_bowtie_summary = tail(log_file, 5)
+        else:
+            self.hairpin_bowtie_summary = tail(log_file, 5)
+
     def remove_intermediates(self):
         for file_ in [self.trimmed,
                       self.filtered,
@@ -70,6 +102,20 @@ class File:
 
     def read_counts_exist(self):
         return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
+
+    def write_summary(self, summary_file):
+        with open(summary_file, 'a') as f:
+            f.write('########## {} Processing Summary ##########\n'.format(self.basename))
+            f.write('Adapter Trimming Results')
+            for line in self.trim_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\nMature Aligning Results')
+            for line in self.mature_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\nHairpin Aligning Results')
+            for line in self.hairpin_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\n')
 
 
 class PyPipeline:
@@ -102,6 +148,7 @@ class PyPipeline:
 
         # Set up directories
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
+        self.summary_file = os.path.join(self.analysis_dir, 'summary.txt')
         self.fastqc_dir = os.path.join(self.analysis_dir, 'fastqc/')
         self.negative_index_dir = os.path.join(self.bowtie_dir, 'neg_ref')
         self.hairpin_index_dir = os.path.join(self.bowtie_dir, 'hp_ref')
@@ -122,6 +169,7 @@ class PyPipeline:
         # Create log file
         os.makedirs(self.analysis_dir, exist_ok=True)
         self._create_log_file()
+        self._create_summary_file()
 
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
@@ -142,9 +190,12 @@ class PyPipeline:
             f.write(unformated_message + '\n')
 
         try:
-            if log_output:
-                subprocess.call(command + ' >> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT,
-                                stdout=subprocess.DEVNULL)
+            if log_stdout and log_stderr:
+                subprocess.call(command + ' &>> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            elif log_stdout:
+                subprocess.call(command + ' >> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            elif log_stderr:
+                subprocess.call(command + ' 2>> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
             else:
                 subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError as exc:
@@ -173,6 +224,11 @@ class PyPipeline:
         command = 'touch {}'.format(self.log_file)
         self._run_command(message, command)
 
+    def _create_summary_file(self):
+        message = 'Creating summary file - {}'.format(os.path.basename(self.summary_file))
+        command = 'touch {}'.format(self.summary_file)
+        self._run_command(message, command)
+
     def _validate_file(self, file_):
         if not os.path.isfile(file_):
             self._log_message('{} does not exist'.format(file_), command_status=self.EXITING)
@@ -184,7 +240,7 @@ class PyPipeline:
                 self._log_message('Cannot find sample condition in config file: {}'.format(file.basename), command_status=self.EXITING)
                 exit(1)
 
-        if set(self.sample_conditions.values()) != set(['control', 'stress']):
+        if any([condition not in set(['control', 'stress']) for condition in self.sample_conditions.values()]):
             self._log_message('Sample conditions can only be "control" or "stress" at this time', command_status=self.EXITING)
             exit(1)
 
@@ -270,12 +326,13 @@ class PyPipeline:
         if os.path.exists(file.trimmed):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_output=True)
+            self._run_command(message, command, log_stdout=True)
+            file.get_trim_summary(self.log_file)
 
             if self.trim_6:
                 message = '{}: Trimming 6 nucleotides'.format(file.basename)
                 command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(file.temp, file.trimmed)
-                self._run_command(message, command, log_output=True)
+                self._run_command(message, command, log_stdout=True)
                 os.remove(file.temp)
             else:
                 os.rename(file.temp, file.trimmed)
@@ -288,7 +345,8 @@ class PyPipeline:
         if os.path.exists(file.filtered):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_output=True)
+            self._run_command(message, command, log_stderr=True)
+            file.get_bowtie_summary(self.log_file, 'filtering')
 
     def _align_reads(self, file):
         mature_index = os.path.join(self.mature_index_dir, os.path.basename(self.mature_index_dir))
@@ -300,7 +358,8 @@ class PyPipeline:
         if os.path.exists(file.mature_aligned_sam) and os.path.exists(file.unaligned):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_output=True)
+            self._run_command(message, command, log_stderr=True)
+            file.get_bowtie_summary(self.log_file, 'mature')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.mature_aligned_sam, file.mature_aligned_bam)
@@ -314,7 +373,8 @@ class PyPipeline:
         if os.path.exists(file.hairpin_aligned_sam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_output=True)
+            self._run_command(message, command, log_stderr=True)
+            file.get_bowtie_summary(self.log_file, 'hairpin')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.hairpin_aligned_sam, file.hairpin_aligned_bam)
@@ -389,6 +449,7 @@ class PyPipeline:
                 self._filter_out_neg(file)
                 self._align_reads(file)
                 self._get_read_counts(file)
+                file.write_summary(self.summary_file)
 
                 if self.delete and self._run_successful(file):
                     self._log_message('{}: Deleting intermediate files'.format(file.basename))
@@ -424,7 +485,7 @@ class PyPipeline:
                                                                                                    go_bp_ids=self.go_bp_id_file,
                                                                                                    go_mf_ids=self.go_mf_id_file,
                                                                                                    go_cc_ids=self.go_cc_id_file)
-        self._run_command(message, command, log_output=True)
+        self._run_command(message, command, log_stdout=True)
 
     def _move_files_by_regex(self, source, dest=None, pattern=None):
         for f in os.listdir(source):
@@ -469,7 +530,7 @@ if __name__ == '__main__':
     #            'configs/hylaliv.ini',
     #            'configs/lemurheart.ini',
     #            'configs/lemurmus.ini',
-    #            'configs/lithep.ini',
+    #            # 'configs/lithep.ini',
     #            'configs/nmrbrain.ini',
     #            'configs/nmrheart.ini',
     #            'configs/rsyeggs.ini',
@@ -480,10 +541,11 @@ if __name__ == '__main__':
     # pipelines = {}
     #
     # for config in configs:
-    #     pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=True)
+    #     pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=False)
     #
     # for pipeline in pipelines.values():
     #     pipeline.run()
-    pipeline = PyPipeline('config.ini', no_prompts=True, fastqc=False)
+    #     pipeline.analyze()
+
+    pipeline = PyPipeline('test_config.ini')
     pipeline.run()
-    pipeline.analyze()
