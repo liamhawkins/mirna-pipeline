@@ -117,7 +117,7 @@ class PyPipeline:
         self.BAD = HTML('<red>BAD</red>')
         self.EXITING = HTML('<red>EXITING</red>')
         self.NONE = HTML('')
-        self.F_PIPELINE = HTML('<teal>{}</teal>'.format(self.pipeline))
+        self.F_PIPELINE = '<teal>{}</teal>'.format(self.pipeline)
 
         # Create log file
         os.makedirs(self.analysis_dir, exist_ok=True)
@@ -134,11 +134,12 @@ class PyPipeline:
         self.trim_6 = None
         self._validate_config()
 
-    def _run_command(self, message, command, log_output=False):
-        formatted_message = '[{}] '.format(self.F_PIPELINE.value) + message + '... '
+    def _run_command(self, message, command, log_stdout=False, log_stderr=False):
+        formatted_message = '[{}] '.format(self.F_PIPELINE) + message + '... '
+        unformated_message = '[{}] '.format(self.pipeline) + message + '... '
         print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
-            f.write(formatted_message)
+            f.write(unformated_message + '\n')
 
         try:
             if log_output:
@@ -160,11 +161,12 @@ class PyPipeline:
         if command_status is None:
             command_status = self.GOOD
 
-        formatted_message = '[{}] '.format(self.F_PIPELINE.value) + message + '... '
+        formatted_message = '[{}] '.format(self.F_PIPELINE) + message + '... '
+        unformated_message = '[{}] '.format(self.pipeline) + message + '... '
         print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
         with open(self.log_file, 'a') as f:
-            f.write(formatted_message + '\n')
+            f.write(unformated_message + '\n')
 
     def _create_log_file(self):
         message = 'Creating log file {}'.format(os.path.basename(self.log_file))
