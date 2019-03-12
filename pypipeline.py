@@ -13,11 +13,6 @@ from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import yes_no_dialog
 
 
-def tail(f, n):
-    proc = subprocess.Popen(['tail', '-n', str(n), f], stdout=subprocess.PIPE)
-    return [line.decode("utf-8") for line in proc.stdout.readlines()]
-
-
 class File:
     def __init__(self, raw_path, analysis_dir):
         self.raw = raw_path
@@ -39,10 +34,6 @@ class File:
         os.makedirs(readcount_dir, exist_ok=True)
         self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
         self.hairpin_readcount = self._create_file('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
-        self.trim_summary = []
-        self.filtering_bowtie_summary = []
-        self.mature_bowtie_summary = []
-        self.hairpin_bowtie_summary = []
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
@@ -62,29 +53,6 @@ class File:
 
         return os.path.join(dir, basename + postfix)
 
-    def get_trim_summary(self, log_file):
-        summary_header_found = False
-        with open(log_file, 'r') as f:
-            for line in f:
-                if line.startswith('=== Summary ==='):
-                    summary_header_found = True
-                elif summary_header_found and line != '\n':
-                    if line.startswith('==='):
-                        break
-                    else:
-                        self.trim_summary.append(line)
-
-    def get_bowtie_summary(self, log_file, bowtie_step):
-        if bowtie_step not in ['filtering', 'mature', 'hairpin']:
-            raise ValueError('bowtie_step must be "filtering", "mature", or "hairpin"')
-
-        if bowtie_step == 'filtering':
-            self.filtering_bowtie_summary = tail(log_file, 4)
-        elif bowtie_step == 'mature':
-            self.mature_bowtie_summary = tail(log_file, 4)
-        else:
-            self.hairpin_bowtie_summary = tail(log_file, 4)
-
     def remove_intermediates(self):
         for file_ in [self.trimmed,
                       self.filtered,
@@ -103,27 +71,6 @@ class File:
     def read_counts_exist(self):
         return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
 
-    def write_summary(self, summary_file):
-        with open(summary_file, 'a') as f:
-            f.write('########## {} Processing Summary ##########\n'.format(self.basename))
-            f.write('Adapter Trimming Results\n')
-            f.write('------------------------\n')
-            for line in self.trim_summary:
-                f.write(line.replace('\n', '') + '\n')
-            f.write('Negative Filtering Results\n')
-            f.write('--------------------------\n')
-            for line in self.filtering_bowtie_summary:
-                f.write(line.replace('\n', '') + '\n')
-            f.write('\nMature Aligning Results\n')
-            f.write('-------------------------\n')
-            for line in self.mature_bowtie_summary:
-                f.write(line.replace('\n', '') + '\n')
-            f.write('\nHairpin Aligning Results\n')
-            f.write('--------------------------\n')
-            for line in self.hairpin_bowtie_summary:
-                f.write(line.replace('\n', '') + '\n')
-            f.write('\n')
-
 
 class PyPipeline:
     def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
@@ -131,6 +78,10 @@ class PyPipeline:
         self.no_prompts = no_prompts
         self.fastqc = fastqc
         self.delete = delete
+        self.trim_summary = []
+        self.filtering_bowtie_summary = []
+        self.mature_bowtie_summary = []
+        self.hairpin_bowtie_summary = []
 
         # Read in Config File
         config = ConfigParser()
@@ -334,7 +285,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(message, command, log_stdout=True)
-            file.get_trim_summary(self.log_file)
+            self.get_trim_summary(self.log_file)
 
             if self.trim_6:
                 message = '{}: Trimming 6 nucleotides'.format(file.basename)
@@ -353,7 +304,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(message, command, log_stderr=True)
-            file.get_bowtie_summary(self.log_file, 'filtering')
+            self.get_bowtie_summary(self.log_file, 'filtering')
 
     def _align_reads(self, file):
         mature_index = os.path.join(self.mature_index_dir, os.path.basename(self.mature_index_dir))
@@ -366,7 +317,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(message, command, log_stderr=True)
-            file.get_bowtie_summary(self.log_file, 'mature')
+            self.get_bowtie_summary(self.log_file, 'mature')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.mature_aligned_sam, file.mature_aligned_bam)
@@ -381,7 +332,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(message, command, log_stderr=True)
-            file.get_bowtie_summary(self.log_file, 'hairpin')
+            self.get_bowtie_summary(self.log_file, 'hairpin')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.hairpin_aligned_sam, file.hairpin_aligned_bam)
@@ -426,6 +377,55 @@ class PyPipeline:
         # TODO Implement more thoroughly than just checking if file is empty
         return os.stat(file.mature_readcount).st_size >= 0 and os.stat(file.hairpin_readcount).st_size >= 0
 
+    @staticmethod
+    def tail(f, n):
+        proc = subprocess.Popen(['tail', '-n', str(n), f], stdout=subprocess.PIPE)
+        return [line.decode("utf-8") for line in proc.stdout.readlines()]
+
+    def get_trim_summary(self, log_file):
+        summary_header_found = False
+        with open(log_file, 'r') as f:
+            for line in f:
+                if line.startswith('=== Summary ==='):
+                    summary_header_found = True
+                elif summary_header_found and line != '\n':
+                    if line.startswith('==='):
+                        break
+                    else:
+                        self.trim_summary.append(line)
+
+    def get_bowtie_summary(self, log_file, bowtie_step):
+        if bowtie_step not in ['filtering', 'mature', 'hairpin']:
+            raise ValueError('bowtie_step must be "filtering", "mature", or "hairpin"')
+
+        if bowtie_step == 'filtering':
+            self.filtering_bowtie_summary = self.tail(log_file, 4)
+        elif bowtie_step == 'mature':
+            self.mature_bowtie_summary = self.tail(log_file, 4)
+        else:
+            self.hairpin_bowtie_summary = self.tail(log_file, 4)
+
+    def write_summary(self, summary_file, file_basename):
+        with open(summary_file, 'a') as f:
+            f.write('########## {} Processing Summary ##########\n'.format(file_basename))
+            f.write('Adapter Trimming Results\n')
+            f.write('------------------------\n')
+            for line in self.trim_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('Negative Filtering Results\n')
+            f.write('--------------------------\n')
+            for line in self.filtering_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\nMature Aligning Results\n')
+            f.write('-------------------------\n')
+            for line in self.mature_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\nHairpin Aligning Results\n')
+            f.write('--------------------------\n')
+            for line in self.hairpin_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
+            f.write('\n')
+
     def run(self):
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
@@ -456,7 +456,7 @@ class PyPipeline:
                 self._filter_out_neg(file)
                 self._align_reads(file)
                 self._get_read_counts(file)
-                file.write_summary(self.summary_file)
+                self.write_summary(self.summary_file, file.basename)
 
                 if self.delete and self._run_successful(file):
                     self._log_message('{}: Deleting intermediate files'.format(file.basename))
