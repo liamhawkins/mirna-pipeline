@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from configparser import ConfigParser
 from datetime import datetime
 
@@ -526,33 +527,36 @@ class PyPipeline:
 
 
 if __name__ == '__main__':
-    # configs = ['configs/13lgsbat.ini',
-    #            'configs/13lgskid.ini',
-    #            'configs/13lgspanc.ini',
-    #            'configs/13lgswat.ini',
-    #            'configs/batmus.ini',
-    #            'configs/bearwat.ini',
-    #            'configs/cpmliv.ini',
-    #            'configs/dormouseliv.ini',
-    #            'configs/hylaliv.ini',
-    #            'configs/lemurheart.ini',
-    #            'configs/lemurmus.ini',
-    #            # 'configs/lithep.ini',
-    #            'configs/nmrbrain.ini',
-    #            'configs/nmrheart.ini',
-    #            'configs/rsyeggs.ini',
-    #            'configs/tseliver.ini',
-    #            'configs/wstheart.ini',
-    #            'configs/xenheart.ini']
-    #
-    # pipelines = {}
-    #
-    # for config in configs:
-    #     pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=False)
-    #
-    # for pipeline in pipelines.values():
-    #     pipeline.run()
-    #     pipeline.analyze()
+    if len(sys.argv) > 1:
+        config = sys.argv[1]
 
-    pipeline = PyPipeline('test_config.ini')
-    pipeline.run()
+        pipeline = PyPipeline(config)
+        pipeline.run()
+        pipeline.analyze()
+    else:
+        configs = ['configs/13lgsbat.ini',
+                   'configs/13lgskid.ini',
+                   'configs/13lgspanc.ini',
+                   'configs/13lgswat.ini',
+                   'configs/batmus.ini',
+                   'configs/bearwat.ini',
+                   'configs/cpmliv.ini',
+                   'configs/dormouseliv.ini',
+                   'configs/hylaliv.ini',
+                   'configs/lemurheart.ini',
+                   'configs/lemurmus.ini',
+                   # 'configs/lithep.ini',
+                   'configs/nmrbrain.ini',
+                   'configs/nmrheart.ini',
+                   'configs/rsyeggs.ini',
+                   'configs/tseliver.ini',
+                   'configs/wstheart.ini',
+                   'configs/xenheart.ini']
+
+        pipelines = {}
+        for config in configs:
+            pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=False)
+
+        for pipeline in pipelines.values():
+            pipeline.run()
+            pipeline.analyze()
