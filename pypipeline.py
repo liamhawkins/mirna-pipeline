@@ -110,6 +110,10 @@ class File:
             f.write('------------------------\n')
             for line in self.trim_summary:
                 f.write(line.replace('\n', '') + '\n')
+            f.write('Negative Filtering Results\n')
+            f.write('--------------------------\n')
+            for line in self.filtering_bowtie_summary:
+                f.write(line.replace('\n', '') + '\n')
             f.write('\nMature Aligning Results\n')
             f.write('-------------------------\n')
             for line in self.mature_bowtie_summary:
