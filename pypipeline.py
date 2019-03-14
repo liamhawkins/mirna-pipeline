@@ -384,16 +384,14 @@ class PyPipeline:
         return [line.decode("utf-8") for line in proc.stdout.readlines()]
 
     def get_trim_summary(self, log_file):
-        summary_header_found = False
         with open(log_file, 'r') as f:
-            for line in f:
-                if line.startswith('=== Summary ==='):
-                    summary_header_found = True
-                elif summary_header_found and line != '\n':
-                    if line.startswith('==='):
-                        break
-                    else:
-                        self.trim_summary.append(line)
+            lines_list = list(f)
+            latest_summary_index = max([i for i, x in enumerate(lines_list) if x.startswith('=== Summary ===')])
+            for line in f[latest_summary_index+1:]:
+                if line.startswith('==='):
+                    break
+                else:
+                    self.trim_summary.append(line)
 
     def get_bowtie_summary(self, log_file, bowtie_step):
         if bowtie_step not in ['filtering', 'mature', 'hairpin']:
@@ -413,16 +411,16 @@ class PyPipeline:
             f.write('------------------------\n')
             for line in self.trim_summary:
                 f.write(line.replace('\n', '') + '\n')
-            f.write('Negative Filtering Results\n')
+            f.write('\nNegative Filtering Results\n')
             f.write('--------------------------\n')
             for line in self.filtering_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\nMature Aligning Results\n')
-            f.write('-------------------------\n')
+            f.write('-----------------------\n')
             for line in self.mature_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\nHairpin Aligning Results\n')
-            f.write('--------------------------\n')
+            f.write('------------------------\n')
             for line in self.hairpin_bowtie_summary:
                 f.write(line.replace('\n', '') + '\n')
             f.write('\n')
