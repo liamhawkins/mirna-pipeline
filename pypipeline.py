@@ -132,7 +132,7 @@ class PyPipeline:
 
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
-            for f in sorted(filenames):
+            for f in sorted([f for f in filenames if f.endswith(('.fastq', '.fq'))]):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
                 self.files.append(File(abs_path, self.analysis_dir))
 
@@ -384,10 +384,11 @@ class PyPipeline:
         return [line.decode("utf-8") for line in proc.stdout.readlines()]
 
     def get_trim_summary(self, log_file):
+        self.trim_summary = []
         with open(log_file, 'r') as f:
             lines_list = list(f)
             latest_summary_index = max([i for i, x in enumerate(lines_list) if x.startswith('=== Summary ===')])
-            for line in f[latest_summary_index+1:]:
+            for line in lines_list[latest_summary_index+1:]:
                 if line.startswith('==='):
                     break
                 else:
@@ -557,4 +558,4 @@ if __name__ == '__main__':
 
         for pipeline in pipelines.values():
             pipeline.run()
-            pipeline.analyze()
+            # pipeline.analyze()
