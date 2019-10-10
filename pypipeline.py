@@ -91,6 +91,7 @@ class PyPipeline:
         self.sample_conditions = {k: v for (k, v) in config['sample_conditions'].items()}
         config = config[config.sections()[0]]
         self.company = config['COMPANY']
+        self.command_log = config.get('COMMAND_LOG', None)
         self.analysis_dir = config['ANALYSIS_DIR']
         self.raw_files_dir = config['RAW_FILES_DIR']
         self.toronto_adapters = config['TORONTO_ADAPTERS']
@@ -142,6 +143,10 @@ class PyPipeline:
         self._validate_config()
 
     def _run_command(self, message, command, log_stdout=False, log_stderr=False):
+        if self.command_log:
+            with open(self.command_log, 'a') as f:
+                f.write(command, '\n')
+
         formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
         unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
         print_formatted_text(HTML(formatted_message), end='', flush=True)
@@ -533,24 +538,7 @@ if __name__ == '__main__':
         pipeline.run()
         pipeline.analyze()
     else:
-        configs = ['configs/13lgsbat.ini',
-                   'configs/13lgskid.ini',
-                   'configs/13lgspanc.ini',
-                   'configs/13lgswat.ini',
-                   'configs/batmus.ini',
-                   'configs/bearwat.ini',
-                   'configs/cpmliv.ini',
-                   'configs/dormouseliv.ini',
-                   'configs/hylaliv.ini',
-                   'configs/lemurheart.ini',
-                   'configs/lemurmus.ini',
-                   # 'configs/lithep.ini',
-                   'configs/nmrbrain.ini',
-                   'configs/nmrheart.ini',
-                   'configs/rsyeggs.ini',
-                   'configs/tseliver.ini',
-                   'configs/wstheart.ini',
-                   'configs/xenheart.ini']
+        configs = ['trouble_shooting/13lgswat.ini']
 
         pipelines = {}
         for config in configs:
