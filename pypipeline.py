@@ -145,7 +145,7 @@ class PyPipeline:
     def _run_command(self, message, command, log_stdout=False, log_stderr=False):
         if self.command_log:
             with open(self.command_log, 'a') as f:
-                f.write(command, '\n')
+                f.write(command + '\n')
 
         formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
         unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
