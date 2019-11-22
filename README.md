@@ -4,6 +4,8 @@ This tool serves as a preproccessing pipeline from raw miRNAseq fastq files to t
 RBioMIR suite of analysis tools producing analysis of known miRNA in publication ready
 figures.
 
+![Screenshot](./screenshot.jpg?raw=true)
+
 ## Installation
 Use git to download the package.
 ```bash
