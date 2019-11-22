@@ -483,8 +483,6 @@ class PyPipeline:
             writer = csv.writer(csv_file)
             writer.writerows(csv_data)
 
-        csv_file.close()
-
     def _copy_read_counts(self):
         for file in self.files:
             shutil.copy(file.mature_readcount, self.figures)
@@ -511,8 +509,8 @@ class PyPipeline:
     def _clean_up(self):
         self._log_message('Cleaning up directories')
         os.remove(self.conditions_file)
-        self._move_files_by_regex(source=self.figures, dest=self.mirna_targets_dir, pattern='hsa.*\.csv')
-        self._move_files_by_regex(source=self.figures, dest=None, pattern='.*read_count.txt')
+        self._move_files_by_regex(source=self.figures, dest=self.mirna_targets_dir, pattern=r'hsa.*\.csv')
+        self._move_files_by_regex(source=self.figures, dest=None, pattern=r'.*read_count.txt')
 
     def analyze(self):
         os.makedirs(self.figures, exist_ok=True)
@@ -520,14 +518,10 @@ class PyPipeline:
 
         # Validate the sample conditions specified in config match specific files
         self._validate_sample_conditions()
-
         self._copy_read_counts()
-
         # "conditions.csv" files must be made for rbiomir
         self._create_conditions_file()
-
         self._run_rscript()
-
         self._clean_up()
 
 
