@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # TODO: Validate all FASTQ files
+import argparse
 import csv
 import os
 import re
@@ -526,19 +527,23 @@ class PyPipeline:
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        config = sys.argv[1]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', action='store', help='Path to config file')
+    parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
+    parser.add_argument('--no-fastqc', action='store_false', dest='fastqc', default=True, help='Do not perform fastqc on raw files')
+    args = parser.parse_args()
 
-        pipeline = PyPipeline(config)
-        pipeline.run()
-        pipeline.analyze()
+    # Path to config can be passed as command line arguments
+    if args.config:
+        configs = [args.config]
     else:
         configs = ['example_config.ini']
 
-        pipelines = {}
-        for config in configs:
-            pipelines[config] = PyPipeline(config, no_prompts=True, fastqc=False)
+    # Set up pipelines
+    pipelines = []
+    for config in configs:
+        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc))
 
-        for pipeline in pipelines.values():
-            pipeline.run()
-            pipeline.analyze()
+    for pipeline in pipelines:
+        pipeline.run()
+        pipeline.analyze()
