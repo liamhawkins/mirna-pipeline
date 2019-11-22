@@ -204,7 +204,7 @@ class PyPipeline:
                 self._log_message('Cannot find sample condition in config file: {}'.format(file.basename), command_status=self.EXITING)
                 exit(1)
 
-        if any([condition not in set(['control', 'stress']) for condition in self.sample_conditions.values()]):
+        if any([condition not in ['control', 'stress'] for condition in self.sample_conditions.values()]):
             self._log_message('Sample conditions can only be "control" or "stress" at this time', command_status=self.EXITING)
             exit(1)
 
@@ -499,7 +499,8 @@ class PyPipeline:
                                                                                                    go_cc_ids=self.go_cc_id_file)
         self._run_command(message, command, log_stdout=True)
 
-    def _move_files_by_regex(self, source, dest=None, pattern=None):
+    @staticmethod
+    def _move_files_by_regex(source, dest=None, pattern=None):
         for f in os.listdir(source):
             if re.search(pattern, f):
                 if dest is None:
@@ -538,7 +539,7 @@ if __name__ == '__main__':
         pipeline.run()
         pipeline.analyze()
     else:
-        configs = ['trouble_shooting/13lgswat.ini']
+        configs = ['example_config.ini']
 
         pipelines = {}
         for config in configs:
@@ -546,4 +547,4 @@ if __name__ == '__main__':
 
         for pipeline in pipelines.values():
             pipeline.run()
-            # pipeline.analyze()
+            pipeline.analyze()
