@@ -45,3 +45,6 @@ In this case it is useful to suppress user prompts with the `--no-prompts` flag:
 ```bash
 python pypipeline.py --no-prompts
 ```
+
+## LICENSE
+[Link](https://choosealicense.com/licenses/mit/)
