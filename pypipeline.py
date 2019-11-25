@@ -550,7 +550,7 @@ if __name__ == '__main__':
     pipelines = []
     for config in configs:
         pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc))
-
-    for pipeline in pipelines:
-        pipeline.run()
-        pipeline.analyze()
+    #
+    # for pipeline in pipelines:
+    #     pipeline.run()
+    #     pipeline.analyze()
