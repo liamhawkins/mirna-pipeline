@@ -444,7 +444,7 @@ class PyPipeline:
         self._build_index(self.mature_index_dir, 'mature')
         self._build_index(self.hairpin_index_dir, 'hairpin')
 
-        if not self.no_prompts:
+        if not self.no_prompts and self.delete is None:
             self.delete = yes_no_dialog(title='Delete files', text='Do you want to delete intermediate files?')
         elif self.delete is None:
             self.delete = True
@@ -539,6 +539,7 @@ if __name__ == '__main__':
     group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_false', dest='fastqc', default=True, help='Do not perform fastqc on raw files')
+    parser.add_argument('--delete', action='store_true', default=None, help='Delete intermediate processing files')
     parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
     args = parser.parse_args()
 
@@ -556,7 +557,7 @@ if __name__ == '__main__':
     # Set up pipelines
     pipelines = []
     for config in configs:
-        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc, no_analysis=args.no_analysis))
+        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc, delete=args.delete, no_analysis=args.no_analysis))
 
     for pipeline in pipelines:
         pipeline.run()
