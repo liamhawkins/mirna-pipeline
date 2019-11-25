@@ -535,8 +535,8 @@ class PyPipeline:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('-c', '--config', action='store', help='Path to config file')
-    group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
+    group.add_argument('-c', '--config', action='store', metavar='<config_file>', help='Path to config file')
+    group.add_argument('-d', '--config-dir', action='store', metavar='<config_dir>', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_true', default=False, help='Do not perform fastqc on raw files')
     parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')

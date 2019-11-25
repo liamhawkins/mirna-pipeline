@@ -46,20 +46,18 @@ A full list of command line options can be found using the help flag:
 ```bash
 >>> pypipeline.py --help
 
-usage: pypipeline.py [-h] [-c CONFIG | -d CONFIG_DIR] [--no-prompts]
-                     [--no-fastqc] [--delete] [--no-analysis]
+usage: pypipeline.py [-h] [-c <config_file> | -d <config_dir>] [--no-prompts] [--no-fastqc] [--no-analysis] [--delete]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -c CONFIG, --config CONFIG
+  -c <config_file>, --config <config_file>
                         Path to config file
-  -d CONFIG_DIR, --config-dir CONFIG_DIR
+  -d <config_dir>, --config-dir <config_dir>
                         Directory containing config files
   --no-prompts          Suppress user prompts
   --no-fastqc           Do not perform fastqc on raw files
   --no-analysis         Do not perform R analysis
   --delete              Delete intermediate processing files
-
 ```
 
 ## LICENSE
