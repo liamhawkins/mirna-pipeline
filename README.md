@@ -30,22 +30,21 @@ analysis you wish to process.
 
 The pipeline can then be run from the command line:
 ```bash
-python pypipeline.py --config example_config.ini
+pypipeline.py --config example_config.ini
 ```
 #### Process and analyze multiple data sets
 Multiple config files defining multiple analysis can
-be run in sequence by supplying paths of each config file to the `configs` variable
-in `pypipeline.py`. i.e:
-```python
-# Path to config can be passed as command line arguments
-if args.config:
-    configs = [args.config]
-else:
-    configs = ['config1.ini', 'config2.ini', 'config3.ini']
+be run in sequence by supplying a directory containing config *.ini files:
+```bash
+pypipeline.py --config-dir dir_containing_configs/
 ```
 In this case it is useful to suppress user prompts with the `--no-prompts` flag:
 ```bash
-python pypipeline.py --no-prompts
+pypipeline.py --no-prompts --config-dir dir_containing_configs/
+```
+A full list of command line options can be found using the help flag:
+```bash
+pypipeline.py --help
 ```
 
 ## LICENSE

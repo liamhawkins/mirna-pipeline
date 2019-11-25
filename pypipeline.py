@@ -528,14 +528,21 @@ class PyPipeline:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', action='store', help='Path to config file')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-c', '--config', action='store', help='Path to config file')
+    group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_false', dest='fastqc', default=True, help='Do not perform fastqc on raw files')
     args = parser.parse_args()
 
-    # Path to config can be passed as command line arguments
+    # Path to config (or dir to multiple configs) can be passed as command line arguments
     if args.config:
         configs = [args.config]
+    elif args.config_dir:
+        configs = []
+        for dirpath, _, filenames in os.walk(args.config_dir):
+            for f in sorted([f for f in filenames if f.endswith('.ini')]):
+                configs.append(os.path.abspath(os.path.join(dirpath, f)))
     else:
         configs = ['example_config.ini']
 
@@ -543,7 +550,7 @@ if __name__ == '__main__':
     pipelines = []
     for config in configs:
         pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc))
-
-    for pipeline in pipelines:
-        pipeline.run()
-        pipeline.analyze()
+    #
+    # for pipeline in pipelines:
+    #     pipeline.run()
+    #     pipeline.analyze()
