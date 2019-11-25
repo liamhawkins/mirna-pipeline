@@ -10,8 +10,10 @@ figures.
 Use git to download the package.
 ```bash
 git clone https://github.com/liamhawkins/mirna-pipeline.git
+cd mirna-pipeline
+pip install -r requirements.txt
 ```
-This pipeline also requires the following programs:
+This pipeline also requires the following programs to be installed on your system:
 ```
 * fastqc
 * fastq-mcf
