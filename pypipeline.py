@@ -75,11 +75,12 @@ class File:
 
 
 class PyPipeline:
-    def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None):
+    def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None, no_analysis=False):
         self.pipeline = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
         self.fastqc = fastqc
         self.delete = delete
+        self.no_analysis = no_analysis
         self.trim_summary = []
         self.filtering_bowtie_summary = []
         self.mature_bowtie_summary = []
@@ -105,7 +106,8 @@ class PyPipeline:
         self.go_bp_id_file = config['GO_BP_ID_FILE']
         self.go_mf_id_file = config['GO_MF_ID_FILE']
         self.go_cc_id_file = config['GO_CC_ID_FILE']
-        self.rpipeline = config['R_SCRIPT']
+        if not self.no_analysis:
+            self.rpipeline = config['R_SCRIPT']
 
         # Set up directories
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
@@ -230,7 +232,8 @@ class PyPipeline:
         self._validate_file(self.go_bp_id_file)
         self._validate_file(self.go_mf_id_file)
         self._validate_file(self.go_cc_id_file)
-        self._validate_file(self.rpipeline)
+        if not self.no_analysis:
+            self._validate_file(self.rpipeline)
 
         print_formatted_text(self.GOOD)
 
@@ -475,6 +478,9 @@ class PyPipeline:
             else:
                 self._log_message('{}: Read counts already created'.format(file.basename), command_status=self.FILE_ALREADY_EXISTS)
 
+        if not self.no_analysis:
+            self.analyze()
+
     def _create_conditions_file(self):
         tmp_list = sorted([[sample, condition] for (sample, condition) in self.sample_conditions.items()])
         csv_data = [['sample', 'condition']]
@@ -533,6 +539,7 @@ if __name__ == '__main__':
     group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_false', dest='fastqc', default=True, help='Do not perform fastqc on raw files')
+    parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
     args = parser.parse_args()
 
     # Path to config (or dir to multiple configs) can be passed as command line arguments
@@ -549,8 +556,7 @@ if __name__ == '__main__':
     # Set up pipelines
     pipelines = []
     for config in configs:
-        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc))
-    #
-    # for pipeline in pipelines:
-    #     pipeline.run()
-    #     pipeline.analyze()
+        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc, no_analysis=args.no_analysis))
+
+    for pipeline in pipelines:
+        pipeline.run()
