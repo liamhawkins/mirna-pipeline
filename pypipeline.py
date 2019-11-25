@@ -75,10 +75,10 @@ class File:
 
 
 class PyPipeline:
-    def __init__(self, config_file, no_prompts=False, fastqc=None, delete=None, no_analysis=False):
+    def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False):
         self.pipeline = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
-        self.fastqc = fastqc
+        self.no_fastqc = no_fastqc
         self.delete = delete
         self.no_analysis = no_analysis
         self.trim_summary = []
@@ -449,12 +449,12 @@ class PyPipeline:
         elif self.delete is None:
             self.delete = True
 
-        if not self.no_prompts and self.fastqc is None:
-            self.fastqc = yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
-        elif self.fastqc is None:
-            self.fastqc = True
+        if not self.no_prompts and self.no_fastqc is None:
+            self.no_fastqc = not yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
+        elif self.no_fastqc is None:
+            self.no_fastqc = False
 
-        if self.fastqc:
+        if not self.no_fastqc:
             for file in self.files:
                 self._fastqc_check(file)
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     group.add_argument('-c', '--config', action='store', help='Path to config file')
     group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
-    parser.add_argument('--no-fastqc', action='store_false', dest='fastqc', default=True, help='Do not perform fastqc on raw files')
+    parser.add_argument('--no-fastqc', action='store_true', default=False, help='Do not perform fastqc on raw files')
     parser.add_argument('--delete', action='store_true', default=None, help='Delete intermediate processing files')
     parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
     args = parser.parse_args()
@@ -557,7 +557,7 @@ if __name__ == '__main__':
     # Set up pipelines
     pipelines = []
     for config in configs:
-        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, fastqc=args.fastqc, delete=args.delete, no_analysis=args.no_analysis))
+        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, no_fastqc=args.no_fastqc, delete=args.delete, no_analysis=args.no_analysis))
 
     for pipeline in pipelines:
         pipeline.run()
