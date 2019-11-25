@@ -539,8 +539,8 @@ if __name__ == '__main__':
     group.add_argument('-d', '--config-dir', action='store', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_true', default=False, help='Do not perform fastqc on raw files')
-    parser.add_argument('--delete', action='store_true', default=None, help='Delete intermediate processing files')
     parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
+    parser.add_argument('--delete', action='store_true', default=None, help='Delete intermediate processing files')
     args = parser.parse_args()
 
     # Path to config (or dir to multiple configs) can be passed as command line arguments
