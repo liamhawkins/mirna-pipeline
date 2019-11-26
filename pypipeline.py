@@ -70,17 +70,27 @@ class File:
             except FileNotFoundError:
                 pass
 
-    def read_counts_exist(self):
-        return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
+    def read_counts_exist(self, mature_only=False, hairpin_only=False):
+        if mature_only:
+            return os.path.isfile(self.mature_readcount)
+        elif hairpin_only:
+            return os.path.isfile(self.hairpin_readcount)
+        else:
+            return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
+
+    def change_read_count_dir(self, dir_):
+        self.mature_readcount = os.path.join(dir_, os.path.basename(self.mature_readcount))
+        self.hairpin_readcount = os.path.join(dir_, os.path.basename(self.hairpin_readcount))
 
 
 class PyPipeline:
-    def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False):
+    def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False, read_count_dir=None):
         self.pipeline = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
         self.no_fastqc = no_fastqc
         self.delete = delete
         self.no_analysis = no_analysis
+        self.analysis_only = bool(read_count_dir)
         self.trim_summary = []
         self.filtering_bowtie_summary = []
         self.mature_bowtie_summary = []
@@ -132,13 +142,16 @@ class PyPipeline:
         # Create log file
         os.makedirs(self.analysis_dir, exist_ok=True)
         self._create_log_file()
-        self._create_summary_file()
 
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
             for f in sorted([f for f in filenames if f.endswith(('.fastq', '.fq'))]):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
                 self.files.append(File(abs_path, self.analysis_dir))
+
+        if self.analysis_only:
+            for file in self.files:
+                file.change_read_count_dir(read_count_dir)
 
         # Set up config-dependent variables
         self.adapters = None
@@ -415,6 +428,7 @@ class PyPipeline:
             self.hairpin_bowtie_summary = self.tail(log_file, 4)
 
     def write_summary(self, summary_file, file_basename):
+        self._create_summary_file()
         with open(summary_file, 'a') as f:
             f.write('########## {} Processing Summary ##########\n'.format(file_basename))
             f.write('Adapter Trimming Results\n')
@@ -436,6 +450,12 @@ class PyPipeline:
             f.write('\n')
 
     def run(self):
+        # If analysis is only being performed, check if Rscript is installed, run analysis, and return
+        if self.analysis_only:
+            self._check_program('Rscript')
+            self.analyze()
+            return
+
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
             self._check_program(program)
@@ -495,7 +515,7 @@ class PyPipeline:
             shutil.copy(file.mature_readcount, self.figures)
 
     def _run_rscript(self):
-        message = 'Running R analyis'
+        message = 'Running R analysis'
         command = 'Rscript {rpipeline} {wd} {kegg_ids} {go_bp_ids} {go_mf_ids} {go_cc_ids}'.format(rpipeline=self.rpipeline,
                                                                                                    wd=self.figures,
                                                                                                    kegg_ids=self.kegg_id_file,
@@ -539,8 +559,10 @@ if __name__ == '__main__':
     group.add_argument('-d', '--config-dir', action='store', metavar='<config_dir>', help='Directory containing config files')
     parser.add_argument('--no-prompts', action='store_true', default=False, help='Suppress user prompts')
     parser.add_argument('--no-fastqc', action='store_true', default=False, help='Do not perform fastqc on raw files')
-    parser.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
     parser.add_argument('--delete', action='store_true', default=None, help='Delete intermediate processing files')
+    analysis_group = parser.add_mutually_exclusive_group()
+    analysis_group.add_argument('--no-analysis', action='store_true', default=False, help='Do not perform R analysis')
+    analysis_group.add_argument('--analysis-only', action='store', dest='read_count_dir', metavar='<read_count_dir>', default=None, type=os.path.abspath, help='Run analysis only on read counts in supplied directory')
     args = parser.parse_args()
 
     # Path to config (or dir to multiple configs) can be passed as command line arguments
@@ -557,7 +579,12 @@ if __name__ == '__main__':
     # Set up pipelines
     pipelines = []
     for config in configs:
-        pipelines.append(PyPipeline(config, no_prompts=args.no_prompts, no_fastqc=args.no_fastqc, delete=args.delete, no_analysis=args.no_analysis))
+        pipelines.append(PyPipeline(config,
+                                    no_prompts=args.no_prompts,
+                                    no_fastqc=args.no_fastqc,
+                                    delete=args.delete,
+                                    no_analysis=args.no_analysis,
+                                    read_count_dir=args.read_count_dir))
 
     for pipeline in pipelines:
         pipeline.run()

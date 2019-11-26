@@ -42,11 +42,19 @@ In this case it is useful to suppress user prompts with the `--no-prompts` flag:
 ```bash
 >>> pypipeline.py --no-prompts --config-dir dir_containing_configs/
 ```
+#### Performing analysis only
+If read counts are already available, you can perform the R analysis only using the
+`--analysis-only` flag:
+```bash
+>>> pypipeline.py --config example_config.ini --analysis-only dir_with_readcounts/
+```
+#### All command line arguments
 A full list of command line options can be found using the help flag:
 ```bash
 >>> pypipeline.py --help
-
-usage: pypipeline.py [-h] [-c <config_file> | -d <config_dir>] [--no-prompts] [--no-fastqc] [--no-analysis] [--delete]
+usage: pypipeline.py [-h] [-c <config_file> | -d <config_dir>] [--no-prompts]
+                     [--no-fastqc] [--delete]
+                     [--no-analysis | --analysis-only <read_count_dir>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -56,8 +64,10 @@ optional arguments:
                         Directory containing config files
   --no-prompts          Suppress user prompts
   --no-fastqc           Do not perform fastqc on raw files
-  --no-analysis         Do not perform R analysis
   --delete              Delete intermediate processing files
+  --no-analysis         Do not perform R analysis
+  --analysis-only <read_count_dir>
+                        Run analysis only on read counts in supplied directory
 ```
 
 ## LICENSE
