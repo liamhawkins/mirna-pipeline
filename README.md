@@ -48,6 +48,8 @@ If read counts are already available, you can perform the R analysis only using 
 ```bash
 >>> pypipeline.py --config example_config.ini --analysis-only dir_with_readcounts/
 ```
+Readcount file names need to be in the following format:
+`<sample_name_from_config>_MATURE.read_count.txt`
 #### All command line arguments
 A full list of command line options can be found using the help flag:
 ```bash
