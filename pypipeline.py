@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 from configparser import ConfigParser
 from datetime import datetime
 
@@ -17,34 +16,70 @@ from prompt_toolkit.shortcuts import yes_no_dialog
 
 class File:
     def __init__(self, raw_path, analysis_dir):
+        """
+        The `File` class creates and manages filepaths of a raw reads file and all
+        intermediate processing files derived from it. A raw read fastq file is trimmed,
+        filtered, aligned etc. during the pipeline and this class makes it easy to track
+        the filepaths for each of these steps.
+
+        :param raw_path: filepath of raw reads fastq file
+        :type raw_path: str
+        :param analysis_dir: pipeline root analysis directory
+        :type analysis_dir: str
+        """
         self.raw = raw_path
         self.analysis_dir = analysis_dir
         self.basename = self._get_basename(raw_path)
-        self.trimmed = self._create_file('.trimmed.fastq')
-        self.temp = self._create_file('.tmp.fastq')
-        self.filtered = self._create_file('.filtered.fastq')
-        self.mature_aligned_sam = self._create_file('_MATURE.aligned.sam')
-        self.mature_aligned_bam = self._create_file('_MATURE.aligned.bam')
-        self.unaligned = self._create_file('.unaligned.fastq')
-        self.hairpin_aligned_sam = self._create_file('_HAIRPIN.aligned.sam')
-        self.hairpin_aligned_bam = self._create_file('_HAIRPIN.aligned.bam')
+        self.trimmed = self._create_filepath('.trimmed.fastq')
+        self.temp = self._create_filepath('.tmp.fastq')
+        self.filtered = self._create_filepath('.filtered.fastq')
+        self.mature_aligned_sam = self._create_filepath('_MATURE.aligned.sam')
+        self.mature_aligned_bam = self._create_filepath('_MATURE.aligned.bam')
+        self.unaligned = self._create_filepath('.unaligned.fastq')
+        self.hairpin_aligned_sam = self._create_filepath('_HAIRPIN.aligned.sam')
+        self.hairpin_aligned_bam = self._create_filepath('_HAIRPIN.aligned.bam')
         self.mature_basename = self._get_basename(self.mature_aligned_sam)
         self.hairpin_basename = self._get_basename(self.hairpin_aligned_sam)
-        self.mature_sorted = self._create_file('.sorted.bam', file=self.mature_aligned_bam)
-        self.hairpin_sorted = self._create_file('.sorted.bam', file=self.hairpin_aligned_bam)
+        self.mature_sorted = self._create_filepath('.sorted.bam', file=self.mature_aligned_bam)
+        self.hairpin_sorted = self._create_filepath('.sorted.bam', file=self.hairpin_aligned_bam)
         readcount_dir = os.path.join(self.analysis_dir, 'read_counts/')
         os.makedirs(readcount_dir, exist_ok=True)
-        self.mature_readcount = self._create_file('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
-        self.hairpin_readcount = self._create_file('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
+        self.mature_readcount = self._create_filepath('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
+        self.hairpin_readcount = self._create_filepath('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.raw, self.analysis_dir)
 
     @staticmethod
     def _get_basename(path):
+        """
+        Get the basename of a file ex. /some/path/basename.descriptor.txt -> basename
+
+        Filenames in this pipeline have a "basename", an optional descriptor, and a file
+        extension all separated by a period.
+
+        :param path: filepath
+        :type path: str
+        :return: basename of filepath
+        :rtype: str
+        """
         return os.path.splitext(os.path.basename(path))[0].split('.')[0]
 
-    def _create_file(self, postfix, file=None, dir=None):
+    def _create_filepath(self, suffix, file=None, dir=None):
+        """
+        Create a new filepath from `self.basename` + `suffix` (or basename of `file` + `suffix`)
+
+        NOTE: This doesn't actually create a file, rather it just forms a string of the filepath
+
+        :param suffix: string used as suffix of new filepath
+        :type suffix: str
+        :param file: optional file to get basename from
+        :type file: str
+        :param dir: optional directory to use in new filepath
+        :type dir: str
+        :return: filepath
+        :rtype: str
+        """
         if file is None:
             basename = self.basename
         else:
@@ -53,9 +88,12 @@ class File:
         if dir is None:
             dir = self.analysis_dir
 
-        return os.path.join(dir, basename + postfix)
+        return os.path.join(dir, basename + suffix)
 
     def remove_intermediates(self):
+        """
+        Remove all intermediate files generated during the pipeline
+        """
         for file_ in [self.trimmed,
                       self.filtered,
                       self.mature_aligned_sam,
@@ -71,26 +109,67 @@ class File:
                 pass
 
     def read_counts_exist(self, mature_only=False, hairpin_only=False):
-        if mature_only:
+        """
+        Check to see if read count file(s) have been created
+
+        :param mature_only: If True, only check if mature readcount file exists
+        :type mature_only: bool
+        :param hairpin_only: If True, only check is hairpin readcount file exists
+        :type hairpin_only: bool
+        :return: boolean result of whether readcount file(s) exist
+        :rtype: bool
+        """
+        if mature_only and hairpin_only:
+            raise ValueError('mature_only and hairpin_only cannot both be True')
+        elif mature_only:
             return os.path.isfile(self.mature_readcount)
         elif hairpin_only:
             return os.path.isfile(self.hairpin_readcount)
         else:
+            # Defaults to check if both mature and hairpin readcount files exist
             return os.path.isfile(self.mature_readcount) and os.path.isfile(self.hairpin_readcount)
 
     def change_read_count_dir(self, dir_):
+        """
+        Change the directory of the readcount filepath string
+
+        This method is useful when readcount files already exist in a specific directory
+
+        :param dir_:  new directory to use in reacount filepaths
+        :type dir_: str
+        """
         self.mature_readcount = os.path.join(dir_, os.path.basename(self.mature_readcount))
         self.hairpin_readcount = os.path.join(dir_, os.path.basename(self.hairpin_readcount))
 
 
 class PyPipeline:
     def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False, read_count_dir=None):
-        self.pipeline = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
+        """
+        A microRNA-seq processing and analysis pipeline
+
+        This class contains all the methods to process and analyse raw reads fastq files and output microRNA read counts
+        and publication quality figures using the RBioMir suite of R packages.
+
+        :param config_file: filepath of config file withall necessary information about location of pipeline resources
+        :type config_file: str
+        :param no_prompts: silence all prompts
+        :type no_prompts: bool
+        :param no_fastqc: do not perform fastqc analysis on raw reads
+        :type no_fastqc: bool
+        :param delete:  delete intermediate processing files after completion of pipeline
+        :type delete: bool
+        :param no_analysis: do not perform R-based analysis of microRNA read counts
+        :type no_analysis: bool
+        :param read_count_dir: if supplied, processing of raw reads is skipped and analysis is performed on read counts
+        :type read_count_dir: str
+        """
+        self.timestamp = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
         self.no_fastqc = no_fastqc
         self.delete = delete
         self.no_analysis = no_analysis
         self.analysis_only = bool(read_count_dir)
+
         self.trim_summary = []
         self.filtering_bowtie_summary = []
         self.mature_bowtie_summary = []
@@ -119,7 +198,7 @@ class PyPipeline:
         if not self.no_analysis:
             self.rpipeline = config['R_SCRIPT']
 
-        # Set up directories
+        # Set up directories and filepaths
         self.log_file = os.path.join(self.analysis_dir, datetime.now().strftime('%d-%m-%y_%H:%M') + '.log')
         self.summary_file = os.path.join(self.analysis_dir, 'summary.txt')
         self.fastqc_dir = os.path.join(self.analysis_dir, 'fastqc/')
@@ -137,18 +216,18 @@ class PyPipeline:
         self.BAD = HTML('<red>BAD</red>')
         self.EXITING = HTML('<red>EXITING</red>')
         self.NONE = HTML('')
-        self.F_PIPELINE = lambda: '<teal>{}</teal>'.format(self.pipeline())
+        self.F_PIPELINE = lambda: '<teal>{}</teal>'.format(self.timestamp())
 
         # Create log file
         os.makedirs(self.analysis_dir, exist_ok=True)
         self._create_log_file()
 
+        # Create File object for each raw reads fastq file
         self.files = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
             for f in sorted([f for f in filenames if f.endswith(('.fastq', '.fq'))]):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
                 self.files.append(File(abs_path, self.analysis_dir))
-
         if self.analysis_only:
             for file in self.files:
                 file.change_read_count_dir(read_count_dir)
@@ -159,12 +238,21 @@ class PyPipeline:
         self._validate_config()
 
     def _run_command(self, message, command, log_stdout=False, log_stderr=False):
+        """
+        # TODO: CONTINUE HERE
+
+        :param message:
+        :param command:
+        :param log_stdout:
+        :param log_stderr:
+        :return:
+        """
         if self.command_log:
             with open(self.command_log, 'a') as f:
                 f.write(command + '\n')
 
         formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
-        unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
+        unformated_message = '[{}] '.format(self.timestamp()) + message + '... '
         print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
             f.write(unformated_message + '\n')
@@ -193,7 +281,7 @@ class PyPipeline:
             command_status = self.GOOD
 
         formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
-        unformated_message = '[{}] '.format(self.pipeline()) + message + '... '
+        unformated_message = '[{}] '.format(self.timestamp()) + message + '... '
         print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
 
         with open(self.log_file, 'a') as f:
