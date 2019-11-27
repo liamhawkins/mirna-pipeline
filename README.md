@@ -7,10 +7,12 @@ figures.
 ![Screenshot](./screenshot.jpg?raw=true)
 
 ## Installation
-Use git to download the package.
+Clone the repository and use a python3 virtualenv to install python requirements.
 ```bash
 >>> git clone https://github.com/liamhawkins/mirna-pipeline.git
 >>> cd mirna-pipeline
+>>> virtualenv venv -p $(which python3)
+>>> source venv/bin/activate
 >>> pip install -r requirements.txt
 ```
 This pipeline also requires the following programs to be installed on your system:
