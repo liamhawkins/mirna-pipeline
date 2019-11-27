@@ -29,7 +29,7 @@ class Sample:
         self.hairpin_basename = self._get_basename(self.hairpin_aligned_sam)
         self.mature_sorted = self._create_filepath('.sorted.bam', file=self.mature_aligned_bam)
         self.hairpin_sorted = self._create_filepath('.sorted.bam', file=self.hairpin_aligned_bam)
-        readcount_dir = os.path.join(self.analysis_dir, 'read_counts/')
+        readcount_dir = os.path.join(self.analysis_dir, 'read_counts')
         os.makedirs(readcount_dir, exist_ok=True)
         self.mature_readcount = self._create_filepath('.read_count.txt', file=self.mature_sorted, dir=readcount_dir)
         self.hairpin_readcount = self._create_filepath('.read_count.txt', file=self.hairpin_sorted, dir=readcount_dir)
