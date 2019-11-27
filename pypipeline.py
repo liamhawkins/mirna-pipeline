@@ -14,10 +14,10 @@ from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import yes_no_dialog
 
 
-class File:
+class Sample:
     def __init__(self, raw_path, analysis_dir):
         """
-        The `File` class creates and manages filepaths of a raw reads file and all
+        The `Sample` class creates and manages filepaths of a raw reads file and all
         intermediate processing files derived from it. A raw read fastq file is trimmed,
         filtered, aligned etc. during the pipeline and this class makes it easy to track
         the filepaths for each of these steps.
@@ -175,7 +175,7 @@ class PyPipeline:
         self.mature_bowtie_summary = []
         self.hairpin_bowtie_summary = []
 
-        # Read in Config File
+        # Read in config file
         config = ConfigParser()
         config.optionxform = str  # Have to replace optionxform function with str to preserve case sensitivity
         config.read(config_file)
@@ -222,15 +222,15 @@ class PyPipeline:
         os.makedirs(self.analysis_dir, exist_ok=True)
         self._create_log_file()
 
-        # Create File object for each raw reads fastq file
-        self.files = []
+        # Create Sample object for each raw reads fastq file
+        self.samples = []
         for dirpath, _, filenames in os.walk(self.raw_files_dir):
             for f in sorted([f for f in filenames if f.endswith(('.fastq', '.fq'))]):
                 abs_path = os.path.abspath(os.path.join(dirpath, f))
-                self.files.append(File(abs_path, self.analysis_dir))
+                self.samples.append(Sample(abs_path, self.analysis_dir))
         if self.analysis_only:
-            for file in self.files:
-                file.change_read_count_dir(read_count_dir)
+            for sample in self.samples:
+                sample.change_read_count_dir(read_count_dir)
 
         # Set up config-dependent adapter variables
         self.adapters = None
@@ -340,9 +340,9 @@ class PyPipeline:
         Validate that all files are present in config file and are specified as `control` or `stress`,
         if not exits with code 1
         """
-        for file in self.files:
-            if file.basename not in self.sample_conditions.keys():
-                self._log_message('Cannot find sample condition in config file: {}'.format(file.basename), command_status=self.EXITING)
+        for sample in self.samples:
+            if sample.basename not in self.sample_conditions.keys():
+                self._log_message('Cannot find sample condition in config file: {}'.format(sample.basename), command_status=self.EXITING)
                 exit(1)
 
         if any([condition not in ['control', 'stress'] for condition in self.sample_conditions.values()]):
@@ -457,110 +457,110 @@ class PyPipeline:
             command = 'bowtie-build {} {}'.format(sequences, os.path.join(dir_, os.path.basename(dir_)))
             self._run_command(command, message)
 
-    def _fastqc_check(self, file):
+    def _fastqc_check(self, sample):
         """
-        Perform fastqc on file
+        Perform fastqc on a sample
 
-        :param file: File object representing sample to be checked
-        :type file: File
+        :param sample: Sample object representing sample to be checked
+        :type sample: Sample
         """
         os.makedirs(self.fastqc_dir, exist_ok=True)
-        message = 'Performing fastqc check on {}'.format(file.basename)
-        command = 'fastqc -q {} -o {}'.format(file.raw, self.fastqc_dir)
+        message = 'Performing fastqc check on {}'.format(sample.basename)
+        command = 'fastqc -q {} -o {}'.format(sample.raw, self.fastqc_dir)
         self._run_command(command, message)
 
-    def _trim_adapters(self, file):
+    def _trim_adapters(self, sample):
         """
-        Perform adapter triming on file using cutadapt program
+        Perform adapter triming on sample using cutadapt program
 
         If `self.trim_6` is True it trims adapter then next 6 nucleotides. This should be used when random 6 base
         barcode adapters are used.
         NOTE: only performed if trimmed file does not already exist
 
-        :param file: File object representing sample to be trimmed
-        :type file: File
+        :param sample: Sample object representing sample to be trimmed
+        :type sample: Sample
         """
-        message = '{}: Trimming adapters'.format(file.basename)
-        command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(self.adapters, file.raw, file.temp)
-        if os.path.exists(file.trimmed):
+        message = '{}: Trimming adapters'.format(sample.basename)
+        command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(self.adapters, sample.raw, sample.temp)
+        if os.path.exists(sample.trimmed):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stdout=True)
             self._get_trim_summary(self.log_file)
 
             if self.trim_6:
-                message = '{}: Trimming 6 nucleotides'.format(file.basename)
-                command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(file.temp, file.trimmed)
+                message = '{}: Trimming 6 nucleotides'.format(sample.basename)
+                command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(sample.temp, sample.trimmed)
                 self._run_command(command, message, log_stdout=True)
-                os.remove(file.temp)
+                os.remove(sample.temp)
             else:
-                os.rename(file.temp, file.trimmed)
+                os.rename(sample.temp, sample.trimmed)
 
-    def _filter_out_neg(self, file):
+    def _filter_out_neg(self, sample):
         """
         Filter out negative reference sequences from trimmed fastq file
 
         For this pipeline, negative reference sequences are other small non-microRNA RNAs such as rRNA, tRNA, piRNA etc.
         NOTE: only performed if filtered file does not already exist
 
-        :param file: File object representing sample to be filtered
-        :type file: File
+        :param sample: Sample object representing sample to be filtered
+        :type sample: Sample
         """
         negative_index = os.path.join(self.negative_index_dir, os.path.basename(self.negative_index_dir))
 
-        message = '{}: Filtering negative RNA species'.format(file.basename)
-        command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, file.trimmed, file.filtered)
-        if os.path.exists(file.filtered):
+        message = '{}: Filtering negative RNA species'.format(sample.basename)
+        command = 'bowtie -p 18 -q {} {} --un {}'.format(negative_index, sample.trimmed, sample.filtered)
+        if os.path.exists(sample.filtered):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
             self._get_bowtie_summary(self.log_file, 'filtering')
 
-    def _align_reads(self, file):
+    def _align_reads(self, sample):
         """
         Align reads from filtered fastq file to mature and hairpin bowtie indexes and convert resulting SAM to BAM file
 
         Alignment to bowtie indexes is performed using bowtie, then samtools is used to convert SAM file to BAM file
         NOTE: only performed if aligned files do not already exist
 
-        :param file: File object representing sample to be aligned
-        :type file: File
+        :param sample: Sample object representing sample to be aligned
+        :type sample: Sample
         """
         mature_index = os.path.join(self.mature_index_dir, os.path.basename(self.mature_index_dir))
         hairpin_index = os.path.join(self.hairpin_index_dir, os.path.basename(self.hairpin_index_dir))
 
-        message = '{}: Aligning to mature index'.format(file.basename)
+        message = '{}: Aligning to mature index'.format(sample.basename)
         command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {} --un {}'.format(
-            mature_index, file.filtered, file.mature_aligned_sam, file.unaligned)
-        if os.path.exists(file.mature_aligned_sam) and os.path.exists(file.unaligned):
+            mature_index, sample.filtered, sample.mature_aligned_sam, sample.unaligned)
+        if os.path.exists(sample.mature_aligned_sam) and os.path.exists(sample.unaligned):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
             self._get_bowtie_summary(self.log_file, 'mature')
 
-        message = '{}: Converting SAM to BAM'.format(file.basename)
-        command = 'samtools view -S -b {} > {}'.format(file.mature_aligned_sam, file.mature_aligned_bam)
-        if os.path.exists(file.mature_aligned_bam):
+        message = '{}: Converting SAM to BAM'.format(sample.basename)
+        command = 'samtools view -S -b {} > {}'.format(sample.mature_aligned_sam, sample.mature_aligned_bam)
+        if os.path.exists(sample.mature_aligned_bam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
-        message = '{}: Aligning to hairpin index'.format(file.basename)
-        command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, file.unaligned, file.hairpin_aligned_sam)
-        if os.path.exists(file.hairpin_aligned_sam):
+        message = '{}: Aligning to hairpin index'.format(sample.basename)
+        command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, sample.unaligned, sample.hairpin_aligned_sam)
+        if os.path.exists(sample.hairpin_aligned_sam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
             self._get_bowtie_summary(self.log_file, 'hairpin')
 
-        message = '{}: Converting SAM to BAM'.format(file.basename)
-        command = 'samtools view -S -b {} > {}'.format(file.hairpin_aligned_sam, file.hairpin_aligned_bam)
-        if os.path.exists(file.hairpin_aligned_bam):
+        message = '{}: Converting SAM to BAM'.format(sample.basename)
+        command = 'samtools view -S -b {} > {}'.format(sample.hairpin_aligned_sam, sample.hairpin_aligned_bam)
+        if os.path.exists(sample.hairpin_aligned_bam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
-    def _get_read_counts(self, file):
+    def _get_read_counts(self, sample):
         """
         Create read count files for mature and hairpin sequences
 
@@ -569,49 +569,49 @@ class PyPipeline:
         is the number of reads.
         NOTE: only performed if read count files do not already exist
 
-        :param file: File object representing sample to get read counts for
-        :type file: File
+        :param sample: Sample object representing sample to get read counts for
+        :type sample: Sample
         """
-        message = '{}: Sorting BAM'.format(file.mature_basename)
-        command = 'samtools sort -n {} -o {}'.format(file.mature_aligned_bam, file.mature_sorted)
-        if os.path.exists(file.mature_sorted):
+        message = '{}: Sorting BAM'.format(sample.mature_basename)
+        command = 'samtools sort -n {} -o {}'.format(sample.mature_aligned_bam, sample.mature_sorted)
+        if os.path.exists(sample.mature_sorted):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
-        message = '{}: Generating read count file'.format(file.mature_basename)
+        message = '{}: Generating read count file'.format(sample.mature_basename)
         command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
-            sorted_file_bam=file.mature_sorted, readcount_file=file.mature_readcount)
-        if os.path.exists(file.mature_readcount):
+            sorted_file_bam=sample.mature_sorted, readcount_file=sample.mature_readcount)
+        if os.path.exists(sample.mature_readcount):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
-        message = '{}: Sorting BAM'.format(file.hairpin_basename)
-        command = 'samtools sort -n {} -o {}'.format(file.hairpin_aligned_bam, file.hairpin_sorted)
-        if os.path.exists(file.hairpin_sorted):
+        message = '{}: Sorting BAM'.format(sample.hairpin_basename)
+        command = 'samtools sort -n {} -o {}'.format(sample.hairpin_aligned_bam, sample.hairpin_sorted)
+        if os.path.exists(sample.hairpin_sorted):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
-        message = '{}: Generating read count file'.format(file.hairpin_basename)
+        message = '{}: Generating read count file'.format(sample.hairpin_basename)
         command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
-            sorted_file_bam=file.hairpin_sorted, readcount_file=file.hairpin_readcount)
-        if os.path.exists(file.hairpin_readcount):
+            sorted_file_bam=sample.hairpin_sorted, readcount_file=sample.hairpin_readcount)
+        if os.path.exists(sample.hairpin_readcount):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message)
 
     @staticmethod
-    def _run_successful(file):
+    def _run_successful(sample):
         """
         Returns true if run was successful for a given sample
 
-        :param file: File object representing sample to check if run was successful
-        :type file: File
+        :param sample: Sample object representing sample to check if run was successful
+        :type sample: Sample
         """
         # TODO Implement more thoroughly than just checking if file is empty
-        return os.stat(file.mature_readcount).st_size >= 0 and os.stat(file.hairpin_readcount).st_size >= 0
+        return os.stat(sample.mature_readcount).st_size >= 0 and os.stat(sample.hairpin_readcount).st_size >= 0
 
     @staticmethod
     def _tail(f, n):
@@ -664,20 +664,20 @@ class PyPipeline:
         else:
             self.hairpin_bowtie_summary = self._tail(log_file, 4)
 
-    def _write_summary(self, summary_file, file):
+    def _write_summary(self, sample, summary_file):
         """
-        Write file containing summary of trimming, filtering, and aligning steps
+        Write file containing summary of trimming, filtering, and aligning steps for a given sample
 
         This file is useful for reporting number of reads that pass different stages of the pipeline
 
+        :param sample: Sample object to write summary about
+        :type sample: Sample
         :param summary_file: filepath to summary file
         :type summary_file: str
-        :param file: File object to write summary about
-        :type file: File
         """
         self._create_summary_file()
         with open(summary_file, 'a') as f:
-            f.write('########## {} Processing Summary ##########\n'.format(file.basename))
+            f.write('########## {} Processing Summary ##########\n'.format(sample.basename))
             f.write('Adapter Trimming Results\n')
             f.write('------------------------\n')
             for line in self.trim_summary:
@@ -730,17 +730,17 @@ class PyPipeline:
         self._build_index(self.hairpin_references, self.hairpin_index_dir, 'hairpin')
 
         if not self.no_fastqc:
-            for file in self.files:
+            for file in self.samples:
                 self._fastqc_check(file)
 
         # Main file processing steps
-        for file in self.files:
+        for file in self.samples:
             if not file.read_counts_exist():
                 self._trim_adapters(file)
                 self._filter_out_neg(file)
                 self._align_reads(file)
                 self._get_read_counts(file)
-                self._write_summary(self.summary_file, file)
+                self._write_summary(file, self.summary_file)
 
                 if self.delete and self._run_successful(file):
                     self._log_message('{}: Deleting intermediate files'.format(file.basename))
@@ -760,7 +760,7 @@ class PyPipeline:
         """
         Create conditions file needed for analysis by RBioMir R packages
 
-        File is csv file where first column is sample name and the second column is sample
+        The file is csv file where first column is sample name and the second column is sample
         condition ('control' or 'stress')
         """
         tmp_list = sorted([[sample, condition] for (sample, condition) in self.sample_conditions.items()])
@@ -775,7 +775,7 @@ class PyPipeline:
         """
         Copy read counts to what will be working directory for R script analysis
         """
-        for file in self.files:
+        for file in self.samples:
             shutil.copy(file.mature_readcount, self.figures)
 
     def _run_rscript(self):
