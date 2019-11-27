@@ -232,7 +232,7 @@ class PyPipeline:
             for file in self.files:
                 file.change_read_count_dir(read_count_dir)
 
-        # Set up config-dependent variables
+        # Set up config-dependent adapter variables
         self.adapters = None
         self.trim_6 = None
         self._validate_config()
@@ -288,32 +288,58 @@ class PyPipeline:
             print_formatted_text(self.GOOD)
 
     def _log_message(self, message, command_status=None, **kwargs):
+        """
+        Log message and print to terminal
+
+        :param message: Message to log and print to terminal
+        :type message: str
+        :param command_status: Optional command status (default=GOOD)
+        :type command_status: HTML
+        :param kwargs: kwargs passed to print_formatted_text function
+        """
+        # Default command status is GOOD
         if command_status is None:
             command_status = self.GOOD
 
-        formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
-        unformated_message = '[{}] '.format(self.timestamp()) + message + '... '
+        # Print message to screen and log message
+        formatted_message = '[{}] {}...'.format(self.F_PIPELINE(), message)
+        unformatted_message = '[{}] {}...'.format(self.timestamp(), message)
         print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
-
         with open(self.log_file, 'a') as f:
-            f.write(unformated_message + '\n')
+            f.write(unformatted_message + '\n')
 
     def _create_log_file(self):
+        """
+        Create log file using touch Unix command
+        """
         message = 'Creating log file {}'.format(os.path.basename(self.log_file))
         command = 'touch {}'.format(self.log_file)
         self._run_command(command, message)
 
     def _create_summary_file(self):
+        """
+        Create summary file using touch Unix command
+        """
         message = 'Creating summary file - {}'.format(os.path.basename(self.summary_file))
         command = 'touch {}'.format(self.summary_file)
         self._run_command(command, message)
 
     def _validate_file(self, file_):
+        """
+        Checks to see if file exists, if not exits with code 1
+
+        :param file_: filepath to file
+        :type file_: str
+        """
         if not os.path.isfile(file_):
             self._log_message('{} does not exist'.format(file_), command_status=self.EXITING)
             exit(1)
 
     def _validate_sample_conditions(self):
+        """
+        Validate that all files are present in config file and are specified as `control` or `stress`,
+        if not exits with code 1
+        """
         for file in self.files:
             if file.basename not in self.sample_conditions.keys():
                 self._log_message('Cannot find sample condition in config file: {}'.format(file.basename), command_status=self.EXITING)
@@ -324,8 +350,12 @@ class PyPipeline:
             exit(1)
 
     def _validate_config(self):
+        """
+        Validates config file, sets config-dependant adapter variables, prompts user with files that will be processed
+        """
         self._log_message('Performing config validation', command_status=self.NONE, end='', flush=True)
 
+        # Set config-dependant adapter variables, exits with code 1 if not BC or TORONTO
         if self.company.upper() == 'TORONTO':
             self.adapters = self.toronto_adapters
             self.trim_6 = False
@@ -336,6 +366,7 @@ class PyPipeline:
             self._log_message('COMPANY must be "BC" or "TORONTO"', command_status=self.EXITING)
             exit(1)
 
+        # Validates resource files specified in config
         self._validate_file(self.adapters)
         self._validate_file(self.negative_references)
         self._validate_file(self.mature_references)
@@ -347,67 +378,115 @@ class PyPipeline:
         if not self.no_analysis:
             self._validate_file(self.rpipeline)
 
-        print_formatted_text(self.GOOD)
-
-        files = '\n'.join([file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
+        # Unless --no-prompts flag used, prompts user with list of found files
         if not self.no_prompts:
+            files = '\n'.join([file for file in sorted(os.listdir(self.raw_files_dir)) if file.endswith('.fastq') or file.endswith('.fq')])
             continue_ = yes_no_dialog(title='File check', text='Are these the files you want to process?\n\n' + files)
             if not continue_:
                 exit(0)
 
         self._validate_sample_conditions()
 
+        print_formatted_text(self.GOOD)
+
     def _check_program(self, program):
+        """
+        Check to see if CLI program is installed
+
+        If program is not found exists with code 1 and log error
+
+        :param program: name of program (CLI command used to call program)
+        :type program: str
+        """
         self._log_message('Checking that {} is installed'.format(program), command_status=self.NONE, end='', flush=True)
 
         try:
+            # Tries to communicate with program, exit with code 1 if not found
             subprocess.Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).communicate()
             print_formatted_text(self.GOOD)
         except OSError as e:
             if e.errno == os.errno.ENOENT:
                 self._log_message('The program {} was not found'.format(program), command_status=self.BAD)
-                exit()
+                exit(1)
             else:
                 self._log_message('An unknown error occurred when looking for {}'.format(program), command_status=self.BAD)
                 raise
 
-    def _index_is_built(self, ind_prefix, index_name):
+    def _index_is_built(self, dir_, name):
+        """
+        Check to see if bowtie index is built
+
+        Given the directory of a specific bowtie index, checks to see that all files in directory have .ebwt extension
+
+        :param dir_: directory of bowtie index
+        :type dir_: str
+        :param name: name of index to display in terminal and log
+        :type name: str
+        :return: True if index is built else False
+        :rtype: bool
+        """
         try:
-            os.listdir(os.path.dirname(ind_prefix))
+            os.listdir(os.path.dirname(dir_))
         except FileNotFoundError:
-            self._log_message('Checking if {} index is built'.format(index_name), command_status=self.NOT_BUILT)
+            self._log_message('Checking if {} index is built'.format(name), command_status=self.NOT_BUILT)
             return False
 
-        for filename in os.listdir(ind_prefix):
-            if not filename.startswith(os.path.basename(ind_prefix)) or not filename.endswith('.ebwt'):
-                self._log_message('Checking if {} index is built'.format(index_name), command_status=self.NOT_BUILT)
+        for filename in os.listdir(dir_):
+            if not filename.startswith(os.path.basename(dir_)) or not filename.endswith('.ebwt'):
+                self._log_message('Checking if {} index is built'.format(name), command_status=self.NOT_BUILT)
                 return False
 
-        self._log_message('Checking if {} index is built'.format(index_name))
+        self._log_message('Checking if {} index is built'.format(name))
         return True
 
-    def _build_index(self, index_dir, index_name):
-        if not self._index_is_built(index_dir, index_name):
-            os.makedirs(index_dir, exist_ok=True)
+    def _build_index(self, sequences, dir_, name):
+        """
+        Build bowtie index using bowtie-build CLI command
 
-            message = 'Building negative index'
-            command = 'bowtie-build {} {}'.format(self.negative_references, os.path.join(index_dir, os.path.basename(index_dir)))
+        :param sequences: filepath of fasta file containing sequences to build index from
+        :type sequences: str
+        :param dir_: directory to build bowtie index
+        :type dir_: str
+        :param name: name of index to use when printing and logging message
+        :type name: str
+        """
+        if not self._index_is_built(dir_, name):
+            os.makedirs(dir_, exist_ok=True)
+
+            message = 'Building {} index'.format(name)
+            command = 'bowtie-build {} {}'.format(sequences, os.path.join(dir_, os.path.basename(dir_)))
             self._run_command(command, message)
 
     def _fastqc_check(self, file):
+        """
+        Perform fastqc on file
+
+        :param file: File object representing sample to be checked
+        :type file: File
+        """
         os.makedirs(self.fastqc_dir, exist_ok=True)
         message = 'Performing fastqc check on {}'.format(file.basename)
         command = 'fastqc -q {} -o {}'.format(file.raw, self.fastqc_dir)
         self._run_command(command, message)
 
     def _trim_adapters(self, file):
+        """
+        Perform adapter triming on file using cutadapt program
+
+        If `self.trim_6` is True it trims adapter then next 6 nucleotides. This should be used when random 6 base
+        barcode adapters are used.
+        NOTE: only performed if trimmed file does not already exist
+
+        :param file: File object representing sample to be trimmed
+        :type file: File
+        """
         message = '{}: Trimming adapters'.format(file.basename)
         command = 'cutadapt -q 20 -m 10 -j 18 -b file:{0} {1} -o {2}'.format(self.adapters, file.raw, file.temp)
         if os.path.exists(file.trimmed):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stdout=True)
-            self.get_trim_summary(self.log_file)
+            self._get_trim_summary(self.log_file)
 
             if self.trim_6:
                 message = '{}: Trimming 6 nucleotides'.format(file.basename)
@@ -418,6 +497,15 @@ class PyPipeline:
                 os.rename(file.temp, file.trimmed)
 
     def _filter_out_neg(self, file):
+        """
+        Filter out negative reference sequences from trimmed fastq file
+
+        For this pipeline, negative reference sequences are other small non-microRNA RNAs such as rRNA, tRNA, piRNA etc.
+        NOTE: only performed if filtered file does not already exist
+
+        :param file: File object representing sample to be filtered
+        :type file: File
+        """
         negative_index = os.path.join(self.negative_index_dir, os.path.basename(self.negative_index_dir))
 
         message = '{}: Filtering negative RNA species'.format(file.basename)
@@ -426,9 +514,18 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
-            self.get_bowtie_summary(self.log_file, 'filtering')
+            self._get_bowtie_summary(self.log_file, 'filtering')
 
     def _align_reads(self, file):
+        """
+        Align reads from filtered fastq file to mature and hairpin bowtie indexes and convert resulting SAM to BAM file
+
+        Alignment to bowtie indexes is performed using bowtie, then samtools is used to convert SAM file to BAM file
+        NOTE: only performed if aligned files do not already exist
+
+        :param file: File object representing sample to be aligned
+        :type file: File
+        """
         mature_index = os.path.join(self.mature_index_dir, os.path.basename(self.mature_index_dir))
         hairpin_index = os.path.join(self.hairpin_index_dir, os.path.basename(self.hairpin_index_dir))
 
@@ -439,7 +536,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
-            self.get_bowtie_summary(self.log_file, 'mature')
+            self._get_bowtie_summary(self.log_file, 'mature')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.mature_aligned_sam, file.mature_aligned_bam)
@@ -454,7 +551,7 @@ class PyPipeline:
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
             self._run_command(command, message, log_stderr=True)
-            self.get_bowtie_summary(self.log_file, 'hairpin')
+            self._get_bowtie_summary(self.log_file, 'hairpin')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
         command = 'samtools view -S -b {} > {}'.format(file.hairpin_aligned_sam, file.hairpin_aligned_bam)
@@ -464,6 +561,17 @@ class PyPipeline:
             self._run_command(command, message)
 
     def _get_read_counts(self, file):
+        """
+        Create read count files for mature and hairpin sequences
+
+        Uses samtools and other CLI commands to produce read count file for matures and file for hairpins. File format
+        is a text file where the first column is the sequence identifier (e.g. microRNA name) and the second column
+        is the number of reads.
+        NOTE: only performed if read count files do not already exist
+
+        :param file: File object representing sample to get read counts for
+        :type file: File
+        """
         message = '{}: Sorting BAM'.format(file.mature_basename)
         command = 'samtools sort -n {} -o {}'.format(file.mature_aligned_bam, file.mature_sorted)
         if os.path.exists(file.mature_sorted):
@@ -496,15 +604,37 @@ class PyPipeline:
 
     @staticmethod
     def _run_successful(file):
+        """
+        Returns true if run was successful for a given sample
+
+        :param file: File object representing sample to check if run was successful
+        :type file: File
+        """
         # TODO Implement more thoroughly than just checking if file is empty
         return os.stat(file.mature_readcount).st_size >= 0 and os.stat(file.hairpin_readcount).st_size >= 0
 
     @staticmethod
-    def tail(f, n):
+    def _tail(f, n):
+        """
+        Helper function to run tail Unix command
+
+        :param f: filepath to run command on
+        :type f: str
+        :param n: number of lines
+        :type n: int
+        :return: Returns list of lines of output of tail command
+        :rtype: list
+        """
         proc = subprocess.Popen(['tail', '-n', str(n), f], stdout=subprocess.PIPE)
         return [line.decode("utf-8") for line in proc.stdout.readlines()]
 
-    def get_trim_summary(self, log_file):
+    def _get_trim_summary(self, log_file):
+        """
+        Retrieve trimming summary from log file
+
+        :param log_file: filepath to log file
+        :type log_file: str
+        """
         self.trim_summary = []
         with open(log_file, 'r') as f:
             lines_list = list(f)
@@ -515,21 +645,39 @@ class PyPipeline:
                 else:
                     self.trim_summary.append(line)
 
-    def get_bowtie_summary(self, log_file, bowtie_step):
+    def _get_bowtie_summary(self, log_file, bowtie_step):
+        """
+        Retrieve bowtie summary from log file
+
+        :param log_file: filepath to log file
+        :type log_file: str
+        :param bowtie_step: 'filtering', 'mature', or 'hairpin'
+        :type bowtie_step: str
+        """
         if bowtie_step not in ['filtering', 'mature', 'hairpin']:
             raise ValueError('bowtie_step must be "filtering", "mature", or "hairpin"')
 
         if bowtie_step == 'filtering':
-            self.filtering_bowtie_summary = self.tail(log_file, 4)
+            self.filtering_bowtie_summary = self._tail(log_file, 4)
         elif bowtie_step == 'mature':
-            self.mature_bowtie_summary = self.tail(log_file, 4)
+            self.mature_bowtie_summary = self._tail(log_file, 4)
         else:
-            self.hairpin_bowtie_summary = self.tail(log_file, 4)
+            self.hairpin_bowtie_summary = self._tail(log_file, 4)
 
-    def write_summary(self, summary_file, file_basename):
+    def _write_summary(self, summary_file, file):
+        """
+        Write file containing summary of trimming, filtering, and aligning steps
+
+        This file is useful for reporting number of reads that pass different stages of the pipeline
+
+        :param summary_file: filepath to summary file
+        :type summary_file: str
+        :param file: File object to write summary about
+        :type file: File
+        """
         self._create_summary_file()
         with open(summary_file, 'a') as f:
-            f.write('########## {} Processing Summary ##########\n'.format(file_basename))
+            f.write('########## {} Processing Summary ##########\n'.format(file.basename))
             f.write('Adapter Trimming Results\n')
             f.write('------------------------\n')
             for line in self.trim_summary:
@@ -549,19 +697,22 @@ class PyPipeline:
             f.write('\n')
 
     def run(self):
+        """
+        Run pipeline.
+
+        This is the main function of the pipeline. After instance of PyPipeline object has been create, this method
+        can be called directly. If `self.analysis_only` is True, processing of raw files is skipped and analysis is
+        performed.
+        """
         # If analysis is only being performed, check if Rscript is installed, run analysis, and return
         if self.analysis_only:
             self._check_program('Rscript')
-            self.analyze()
+            self._analyze()
             return
 
         # Validate all required programs are installed
         for program in ['fastqc', 'fastq-mcf', 'cutadapt', 'bowtie-build', 'bowtie', 'samtools', 'Rscript']:
             self._check_program(program)
-
-        self._build_index(self.negative_index_dir, 'negative')
-        self._build_index(self.mature_index_dir, 'mature')
-        self._build_index(self.hairpin_index_dir, 'hairpin')
 
         if not self.no_prompts and self.delete is None:
             self.delete = yes_no_dialog(title='Delete files', text='Do you want to delete intermediate files?')
@@ -572,6 +723,11 @@ class PyPipeline:
             self.no_fastqc = not yes_no_dialog(title='FastQC', text='Do you want to perform FastQC on all files?')
         elif self.no_fastqc is None:
             self.no_fastqc = False
+
+        # Build all three bowtie indexes
+        self._build_index(self.negative_references, self.negative_index_dir, 'negative')
+        self._build_index(self.mature_references, self.mature_index_dir, 'mature')
+        self._build_index(self.hairpin_references, self.hairpin_index_dir, 'hairpin')
 
         if not self.no_fastqc:
             for file in self.files:
@@ -584,7 +740,7 @@ class PyPipeline:
                 self._filter_out_neg(file)
                 self._align_reads(file)
                 self._get_read_counts(file)
-                self.write_summary(self.summary_file, file.basename)
+                self._write_summary(self.summary_file, file)
 
                 if self.delete and self._run_successful(file):
                     self._log_message('{}: Deleting intermediate files'.format(file.basename))
@@ -598,9 +754,15 @@ class PyPipeline:
                 self._log_message('{}: Read counts already created'.format(file.basename), command_status=self.FILE_ALREADY_EXISTS)
 
         if not self.no_analysis:
-            self.analyze()
+            self._analyze()
 
     def _create_conditions_file(self):
+        """
+        Create conditions file needed for analysis by RBioMir R packages
+
+        File is csv file where first column is sample name and the second column is sample
+        condition ('control' or 'stress')
+        """
         tmp_list = sorted([[sample, condition] for (sample, condition) in self.sample_conditions.items()])
         csv_data = [['sample', 'condition']]
         csv_data.extend(tmp_list)
@@ -610,10 +772,25 @@ class PyPipeline:
             writer.writerows(csv_data)
 
     def _copy_read_counts(self):
+        """
+        Copy read counts to what will be working directory for R script analysis
+        """
         for file in self.files:
             shutil.copy(file.mature_readcount, self.figures)
 
     def _run_rscript(self):
+        """
+        Run R script
+
+        This pipeline was designed to be analysed using an R script composed from RBioMir package functions. The path to
+        the R script is specified in the config file and must take the following command line arguments in order:
+
+        * `Path to working directory`
+        * `Path to KEGG GMT file`
+        * `Path to GO BP GMT file`
+        * `Path to GO MF GMT file`
+        * `Path to GO CC GMT file`
+        """
         message = 'Running R analysis'
         command = 'Rscript {rpipeline} {wd} {kegg_ids} {go_bp_ids} {go_mf_ids} {go_cc_ids}'.format(rpipeline=self.rpipeline,
                                                                                                    wd=self.figures,
@@ -625,6 +802,16 @@ class PyPipeline:
 
     @staticmethod
     def _move_files_by_regex(source, dest=None, pattern=None):
+        """
+        Move files matching regex pattern from source to destination
+
+        :param source: source directory
+        :type source: str
+        :param dest: destination directory
+        :param dest: str
+        :param pattern: regex pattern
+        :type pattern: str
+        """
         for f in os.listdir(source):
             if re.search(pattern, f):
                 if dest is None:
@@ -633,12 +820,23 @@ class PyPipeline:
                     os.rename(os.path.join(source, f), os.path.join(dest, f))
 
     def _clean_up(self):
+        """
+        Clean up directory after R analysis completes
+
+        This method deletes the conditions file created before R script is run, new copies of the read_count files,
+        and moves the microRNA target files to the microRNA targets directory
+        """
         self._log_message('Cleaning up directories')
         os.remove(self.conditions_file)
         self._move_files_by_regex(source=self.figures, dest=self.mirna_targets_dir, pattern=r'hsa.*\.csv')
         self._move_files_by_regex(source=self.figures, dest=None, pattern=r'.*read_count.txt')
 
-    def analyze(self):
+    def _analyze(self):
+        """
+        Run analysis on read count files
+
+        This method sets up the nessessary conditions for the R script to be run, runs the R analysis, then cleans up
+        """
         os.makedirs(self.figures, exist_ok=True)
         os.makedirs(self.mirna_targets_dir, exist_ok=True)
 
