@@ -237,35 +237,46 @@ class PyPipeline:
         self.trim_6 = None
         self._validate_config()
 
-    def _run_command(self, message, command, log_stdout=False, log_stderr=False):
+    def _run_command(self, command, message, log_stdout=False, log_stderr=False):
         """
-        # TODO: CONTINUE HERE
+        Run CLI command, log and show message in terminal and whether command completed without error
 
-        :param message:
-        :param command:
-        :param log_stdout:
-        :param log_stderr:
-        :return:
+        This method is used to run all CLI commands of the pipeline, giving an easy way to take the bash
+        commands you would run and log them to the command log, log their results/output to the log file
+        and print a message to the terminal
+
+        :param command: bash command to run
+        :type command: str
+        :param message: message to print to terminal telling user what command/process is running
+        :type message: str
+        :param log_stdout: whether to log stdout produced by command
+        :type log_stdout: bool
+        :param log_stderr: whether to log stderr produced by commond
+        :type log_stderr: bool
         """
+        # Log command to command log
         if self.command_log:
             with open(self.command_log, 'a') as f:
                 f.write(command + '\n')
 
-        formatted_message = '[{}] '.format(self.F_PIPELINE()) + message + '... '
-        unformated_message = '[{}] '.format(self.timestamp()) + message + '... '
+        # Print message to screen and log message
+        formatted_message = '[{}] {}...'.format(self.F_PIPELINE(), message)
+        unformatted_message = '[{}] {}...'.format(self.timestamp(), message)
         print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
-            f.write(unformated_message + '\n')
+            f.write(unformatted_message + '\n')
 
+        # Destinations added to command to direct stdout, stderr, or neither to the log
+        if log_stdout and log_stderr:
+            command += ' &>> {}'.format(self.log_file)
+        elif log_stdout:
+            command += ' >> {}'.format(self.log_file)
+        elif log_stderr:
+            command += ' 2>> {}'.format(self.log_file)
+
+        # Call command, if error print to screen, log error, and exit with code 1
         try:
-            if log_stdout and log_stderr:
-                subprocess.call(command + ' &>> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-            elif log_stdout:
-                subprocess.call(command + ' >> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-            elif log_stderr:
-                subprocess.call(command + ' 2>> {}'.format(self.log_file), shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-            else:
-                subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError as exc:
             print_formatted_text(self.BAD)
             print('ERROR:')
@@ -273,8 +284,8 @@ class PyPipeline:
             with open(self.log_file, 'a') as f:
                 f.write(exc.output.decode('utf-8'))
             exit(1)
-
-        print_formatted_text(self.GOOD)
+        else:
+            print_formatted_text(self.GOOD)
 
     def _log_message(self, message, command_status=None, **kwargs):
         if command_status is None:
@@ -290,12 +301,12 @@ class PyPipeline:
     def _create_log_file(self):
         message = 'Creating log file {}'.format(os.path.basename(self.log_file))
         command = 'touch {}'.format(self.log_file)
-        self._run_command(message, command)
+        self._run_command(command, message)
 
     def _create_summary_file(self):
         message = 'Creating summary file - {}'.format(os.path.basename(self.summary_file))
         command = 'touch {}'.format(self.summary_file)
-        self._run_command(message, command)
+        self._run_command(command, message)
 
     def _validate_file(self, file_):
         if not os.path.isfile(file_):
@@ -381,13 +392,13 @@ class PyPipeline:
 
             message = 'Building negative index'
             command = 'bowtie-build {} {}'.format(self.negative_references, os.path.join(index_dir, os.path.basename(index_dir)))
-            self._run_command(message, command)
+            self._run_command(command, message)
 
     def _fastqc_check(self, file):
         os.makedirs(self.fastqc_dir, exist_ok=True)
         message = 'Performing fastqc check on {}'.format(file.basename)
         command = 'fastqc -q {} -o {}'.format(file.raw, self.fastqc_dir)
-        self._run_command(message, command)
+        self._run_command(command, message)
 
     def _trim_adapters(self, file):
         message = '{}: Trimming adapters'.format(file.basename)
@@ -395,13 +406,13 @@ class PyPipeline:
         if os.path.exists(file.trimmed):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_stdout=True)
+            self._run_command(command, message, log_stdout=True)
             self.get_trim_summary(self.log_file)
 
             if self.trim_6:
                 message = '{}: Trimming 6 nucleotides'.format(file.basename)
                 command = 'cutadapt -u 6 -j 18 {0} -o {1}'.format(file.temp, file.trimmed)
-                self._run_command(message, command, log_stdout=True)
+                self._run_command(command, message, log_stdout=True)
                 os.remove(file.temp)
             else:
                 os.rename(file.temp, file.trimmed)
@@ -414,7 +425,7 @@ class PyPipeline:
         if os.path.exists(file.filtered):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_stderr=True)
+            self._run_command(command, message, log_stderr=True)
             self.get_bowtie_summary(self.log_file, 'filtering')
 
     def _align_reads(self, file):
@@ -427,7 +438,7 @@ class PyPipeline:
         if os.path.exists(file.mature_aligned_sam) and os.path.exists(file.unaligned):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_stderr=True)
+            self._run_command(command, message, log_stderr=True)
             self.get_bowtie_summary(self.log_file, 'mature')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
@@ -435,14 +446,14 @@ class PyPipeline:
         if os.path.exists(file.mature_aligned_bam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
         message = '{}: Aligning to hairpin index'.format(file.basename)
         command = 'bowtie -p 18 -q -l 20 -n 0 -v 2 -a -S --best --strata {} {} --al -S {}'.format(hairpin_index, file.unaligned, file.hairpin_aligned_sam)
         if os.path.exists(file.hairpin_aligned_sam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command, log_stderr=True)
+            self._run_command(command, message, log_stderr=True)
             self.get_bowtie_summary(self.log_file, 'hairpin')
 
         message = '{}: Converting SAM to BAM'.format(file.basename)
@@ -450,7 +461,7 @@ class PyPipeline:
         if os.path.exists(file.hairpin_aligned_bam):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
     def _get_read_counts(self, file):
         message = '{}: Sorting BAM'.format(file.mature_basename)
@@ -458,7 +469,7 @@ class PyPipeline:
         if os.path.exists(file.mature_sorted):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
         message = '{}: Generating read count file'.format(file.mature_basename)
         command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
@@ -466,14 +477,14 @@ class PyPipeline:
         if os.path.exists(file.mature_readcount):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
         message = '{}: Sorting BAM'.format(file.hairpin_basename)
         command = 'samtools sort -n {} -o {}'.format(file.hairpin_aligned_bam, file.hairpin_sorted)
         if os.path.exists(file.hairpin_sorted):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
         message = '{}: Generating read count file'.format(file.hairpin_basename)
         command = "samtools view {sorted_file_bam} | awk '{{print $3}}' | sort | uniq -c | sort -nr > {readcount_file}".format(
@@ -481,7 +492,7 @@ class PyPipeline:
         if os.path.exists(file.hairpin_readcount):
             self._log_message(message, command_status=self.FILE_ALREADY_EXISTS)
         else:
-            self._run_command(message, command)
+            self._run_command(command, message)
 
     @staticmethod
     def _run_successful(file):
@@ -610,7 +621,7 @@ class PyPipeline:
                                                                                                    go_bp_ids=self.go_bp_id_file,
                                                                                                    go_mf_ids=self.go_mf_id_file,
                                                                                                    go_cc_ids=self.go_cc_id_file)
-        self._run_command(message, command, log_stdout=True)
+        self._run_command(command, message, log_stdout=True)
 
     @staticmethod
     def _move_files_by_regex(source, dest=None, pattern=None):
