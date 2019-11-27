@@ -14,15 +14,16 @@ Use git to download the package.
 >>> pip install -r requirements.txt
 ```
 This pipeline also requires the following programs to be installed on your system:
-```
-* fastqc
-* fastq-mcf
-* cutadapt
-* bowtie-build
-* bowtie
-* samtools
-* Rscript
-```
+
+| Program | Version Tested |
+| --- | --- | 
+| `fastqc` | 0.10.1 |
+| `fastq-mcf` | 1.05 |
+| `cutadapt` | 1.17 |
+| `bowtie-build` | 1.0.0 |
+| `bowtie` | 1.0.0 |
+| `samtools` | 1.3.1 |
+| `Rscript` | 3.5.2 |
 
 ## Usage
 Create a config file (See `example_config.ini` for exact template) for each set of
