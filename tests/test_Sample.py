@@ -6,9 +6,10 @@ from sample import Sample
 
 
 class TestSampleInit(unittest.TestCase):
-    raw_path = '/some/path/to/a/file1.fastq'.replace('/', os.sep)
-    analysis_dir = '/path/to/analysis_dir'.replace('/', os.sep)
-    sample = Sample(raw_path=raw_path, analysis_dir=analysis_dir)
+    def setUp(self):
+        self.raw_path = '/some/path/to/a/file1.fastq'.replace('/', os.sep)
+        self.analysis_dir = '/path/to/analysis_dir'.replace('/', os.sep)
+        self.sample = Sample(raw_path=self.raw_path, analysis_dir=self.analysis_dir)
 
     def test_repr(self):
         self.assertEqual(repr(self.sample), 'Sample(/some/path/to/a/file1.fastq, /path/to/analysis_dir)'.replace('/', os.sep))
@@ -115,8 +116,11 @@ class TestSampleMethods(unittest.TestCase):
         self.assertFalse(sample.read_counts_exist(mature_only=True))
         self.assertFalse(sample.read_counts_exist(hairpin_only=True))
 
-
     def test_change_read_count_dir(self):
         self.sample.change_read_count_dir('/new/readcount_dir'.replace('/', os.sep))
         self.assertEqual(self.sample.mature_readcount, '/new/readcount_dir/file1_MATURE.read_count.txt'.replace('/', os.sep))
         self.assertEqual(self.sample.hairpin_readcount, '/new/readcount_dir/file1_HAIRPIN.read_count.txt'.replace('/', os.sep))
+
+
+if __name__ == '__main__':
+    unittest.main()

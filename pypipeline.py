@@ -17,7 +17,7 @@ from sample import Sample
 
 
 class PyPipeline:
-    def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False, read_count_dir=None):
+    def __init__(self, config_file, no_prompts=False, no_fastqc=None, delete=None, no_analysis=False, read_count_dir=None, testing=False):
         """
         A microRNA-seq processing and analysis pipeline
 
@@ -36,6 +36,8 @@ class PyPipeline:
         :type no_analysis: bool
         :param read_count_dir: if supplied, processing of raw reads is skipped and analysis is performed on read counts
         :type read_count_dir: str
+        :param testing: set to true for running tests that can't render HTML objects
+        :type testing: bool
         """
         self.timestamp = lambda: datetime.now().strftime("%Y-%m-%d %H:%M")
         self.no_prompts = no_prompts
@@ -43,6 +45,7 @@ class PyPipeline:
         self.delete = delete
         self.no_analysis = no_analysis
         self.analysis_only = bool(read_count_dir)
+        self.testing = testing
 
         self.trim_summary = []
         self.filtering_bowtie_summary = []
@@ -111,6 +114,10 @@ class PyPipeline:
         self.trim_6 = None
         self._validate_config()
 
+    def print_formatted_text(self, *args, **kwargs):
+        if not self.testing:
+            print_formatted_text(*args, **kwargs)
+
     def _run_command(self, command, message, log_stdout=False, log_stderr=False):
         """
         Run CLI command, log and show message in terminal and whether command completed without error
@@ -136,7 +143,7 @@ class PyPipeline:
         # Print message to screen and log message
         formatted_message = '[{}] {}...'.format(self.F_PIPELINE(), message)
         unformatted_message = '[{}] {}...'.format(self.timestamp(), message)
-        print_formatted_text(HTML(formatted_message), end='', flush=True)
+        self.print_formatted_text(HTML(formatted_message), end='', flush=True)
         with open(self.log_file, 'a') as f:
             f.write(unformatted_message + '\n')
 
@@ -152,14 +159,14 @@ class PyPipeline:
         try:
             subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError as exc:
-            print_formatted_text(self.BAD)
+            self.print_formatted_text(self.BAD)
             print('ERROR:')
             print(exc.output.decode('utf-8'))
             with open(self.log_file, 'a') as f:
                 f.write(exc.output.decode('utf-8'))
             exit(1)
         else:
-            print_formatted_text(self.GOOD)
+            self.print_formatted_text(self.GOOD)
 
     def _log_message(self, message, command_status=None, **kwargs):
         """
@@ -178,7 +185,7 @@ class PyPipeline:
         # Print message to screen and log message
         formatted_message = '[{}] {}...'.format(self.F_PIPELINE(), message)
         unformatted_message = '[{}] {}...'.format(self.timestamp(), message)
-        print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
+        self.print_formatted_text(HTML(formatted_message + command_status.value), **kwargs)
         with open(self.log_file, 'a') as f:
             f.write(unformatted_message + '\n')
 
@@ -261,7 +268,7 @@ class PyPipeline:
 
         self._validate_sample_conditions()
 
-        print_formatted_text(self.GOOD)
+        self.print_formatted_text(self.GOOD)
 
     def _check_program(self, program):
         """
@@ -277,14 +284,10 @@ class PyPipeline:
         try:
             # Tries to communicate with program, exit with code 1 if not found
             subprocess.Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).communicate()
-            print_formatted_text(self.GOOD)
-        except OSError as e:
-            if e.errno == os.errno.ENOENT:
-                self._log_message('The program {} was not found'.format(program), command_status=self.BAD)
-                exit(1)
-            else:
-                self._log_message('An unknown error occurred when looking for {}'.format(program), command_status=self.BAD)
-                raise
+            self.print_formatted_text(self.GOOD)
+        except OSError:
+            self._log_message('The program {} was not found'.format(program), command_status=self.BAD)
+            exit(1)
 
     def _index_is_built(self, dir_, name):
         """
@@ -300,7 +303,7 @@ class PyPipeline:
         :rtype: bool
         """
         try:
-            os.listdir(os.path.dirname(dir_))
+            os.listdir(dir_)
         except FileNotFoundError:
             self._log_message('Checking if {} index is built'.format(name), command_status=self.NOT_BUILT)
             return False
@@ -714,8 +717,6 @@ class PyPipeline:
         os.makedirs(self.figures, exist_ok=True)
         os.makedirs(self.mirna_targets_dir, exist_ok=True)
 
-        # Validate the sample conditions specified in config match specific files
-        self._validate_sample_conditions()
         self._copy_read_counts()
         # "conditions.csv" files must be made for rbiomir
         self._create_conditions_file()
